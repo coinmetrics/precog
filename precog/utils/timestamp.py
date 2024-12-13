@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from typing import Optional, Union
 
 from pytz import timezone
 
@@ -21,12 +22,25 @@ def get_now() -> datetime:
     return datetime.now(get_timezone())
 
 
-def get_before(minutes: int = 5, seconds: int = 0) -> datetime:
+def get_before(
+    timestamp: Optional[Union[datetime, str, float]] = None,
+    days: int = 0,
+    hours: int = 0,
+    minutes: int = 5,
+    seconds: int = 0,
+) -> datetime:
     """
     Get the datetime x minutes before now
     """
-    now = get_now()
-    return now - timedelta(minutes=minutes, seconds=seconds)
+    if timestamp is None:
+        timestamp = get_now()
+    else:
+        timestamp = to_datetime(timestamp)
+
+    # Perform the time subtraction
+    before_timestamp = timestamp - timedelta(days=days, hours=hours, minutes=minutes, seconds=seconds)
+
+    return before_timestamp
 
 
 def get_midnight() -> datetime:
@@ -40,14 +54,14 @@ def get_posix() -> float:
     """
     Get the current POSIX time, seconds that have elapsed since Jan 1 1970
     """
-    return datetime_to_posix(get_now())
+    return to_posix(get_now())
 
 
-def get_iso8601() -> str:
+def get_str() -> str:
     """
     Get the current timestamp as a string, convenient for requests
     """
-    return datetime_to_iso8601(get_now())
+    return to_str(get_now())
 
 
 ###############################
@@ -55,39 +69,58 @@ def get_iso8601() -> str:
 ###############################
 
 
-def datetime_to_posix(timestamp: datetime) -> float:
+def to_posix(timestamp: Union[datetime, str, float]) -> float:
     """
     Convert datetime to seconds that have elapsed since Jan 1 1970
     """
-    return timestamp.timestamp()
+
+    # Verify datetime object and convert to UTC
+    utc_datetime = to_datetime(timestamp)
+
+    # Convert to posix time float
+    posix_timestamp = utc_datetime.timestamp()
+
+    return float(posix_timestamp)
 
 
-def datetime_to_iso8601(timestamp: datetime) -> str:
+def to_str(timestamp: Union[datetime, str, float]) -> str:
     """
     Convert datetime to iso 8601 string
     """
-    return timestamp.isoformat()
+
+    # Verify datetime object and convert to UTC
+    utc_datetime = to_datetime(timestamp)
+
+    # Convert to iso8601 string
+    str_datetime = utc_datetime.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+
+    return str(str_datetime)
 
 
-def iso8601_to_datetime(timestamp: str) -> datetime:
+def to_datetime(timestamp: Union[str, float]) -> datetime:
     """
-    Convert iso 8601 string to datetime
+    Convert iso 8601 string, or a POSIX time float, to datetime
     """
-    return datetime.fromisoformat(timestamp)
+    if isinstance(timestamp, str):
+        # Assume the proper iso 8601 string format is used
+        # `strptime` will trigger an error as needed
+        return datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=get_timezone())
 
+    elif isinstance(timestamp, float):
+        # Assume proper float value
+        # `fromtimestamp` will trigger errors as needed
+        return datetime.fromtimestamp(timestamp, tz=get_timezone())
 
-def posix_to_datetime(timestamp: float) -> datetime:
-    """
-    Convert seconds since Jan 1 1970 to datetime
-    """
-    return datetime.fromtimestamp(timestamp, tz=get_timezone())
+    elif isinstance(timestamp, datetime):
+        # Already a datetime object
+        # Return as UTC
+        return timestamp.astimezone(get_timezone())
 
-
-def datetime_to_CM_timestamp(timestamp: datetime) -> str:
-    """
-    Convert iso 8601 string to coinmetrics timestamp
-    """
-    return timestamp.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    else:
+        # Invalid typing
+        raise TypeError(
+            "Must pass a timestamp that is either a iso 8601 string, POSIX time float, or a datetime object"
+        )
 
 
 ###############################
@@ -128,8 +161,8 @@ def is_query_time(prediction_interval: int, timestamp: str, tolerance: int = 120
         First, check that we are in a new epoch
         Then, check if we already sent a request in the current epoch
     """
-    now = get_now()
-    provided_timestamp = iso8601_to_datetime(timestamp)
+    now: datetime = get_now()
+    provided_timestamp: datetime = to_datetime(timestamp)
 
     # The provided timestamp is the last time a request was made. If this timestamp
     # is from the current epoch, we do not want to make a request. One way to check

@@ -12,14 +12,7 @@ from precog.protocol import Challenge
 from precog.utils.bittensor import check_uid_availability, print_info, setup_bittensor_objects
 from precog.utils.classes import MinerHistory
 from precog.utils.general import func_with_retry, loop_handler
-from precog.utils.timestamp import (
-    datetime_to_iso8601,
-    elapsed_seconds,
-    get_before,
-    get_now,
-    is_query_time,
-    iso8601_to_datetime,
-)
+from precog.utils.timestamp import elapsed_seconds, get_before, get_now, get_str, is_query_time, to_datetime, to_str
 from precog.utils.wandb import log_wandb, setup_wandb
 from precog.validators.reward import calc_rewards
 
@@ -113,7 +106,7 @@ class weight_setter:
         self.save_state()
 
     def query_miners(self):
-        timestamp = datetime_to_iso8601(get_now())
+        timestamp = get_str()
         synapse = Challenge(timestamp=timestamp)
         responses = self.dendrite.query(
             # Send the query to selected miner axons in the network.
@@ -163,8 +156,8 @@ class weight_setter:
 
     async def scheduled_prediction_request(self):
         if not hasattr(self, "timestamp"):
-            self.timestamp = datetime_to_iso8601(get_before(minutes=self.prediction_interval))
-        query_lag = elapsed_seconds(get_now(), iso8601_to_datetime(self.timestamp))
+            self.timestamp = to_str(get_before(minutes=self.prediction_interval))
+        query_lag = elapsed_seconds(get_now(), to_datetime(self.timestamp))
         if len(self.available_uids) == 0:
             bt.logging.info("No miners available. Sleeping for 10 minutes...")
             print_info(self)

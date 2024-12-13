@@ -1,4 +1,3 @@
-from datetime import timedelta
 from typing import Tuple
 
 import bittensor as bt
@@ -6,7 +5,7 @@ import pandas as pd
 
 from precog.protocol import Challenge
 from precog.utils.cm_data import CMData
-from precog.utils.timestamp import datetime_to_CM_timestamp, iso8601_to_datetime
+from precog.utils.timestamp import get_before, to_datetime, to_str
 
 
 def get_point_estimate(timestamp: str) -> float:
@@ -21,13 +20,13 @@ def get_point_estimate(timestamp: str) -> float:
     # Create data gathering instance
     cm = CMData()
 
-    # Set the time range to be as small as possible for query speed
-    # Set the start time as 2 seconds prior to the provided time
-    start_time: str = datetime_to_CM_timestamp(iso8601_to_datetime(timestamp) - timedelta(days=1))
-    end_time: str = datetime_to_CM_timestamp(iso8601_to_datetime(timestamp))  # built-ins handle CM API's formatting
+    # Ensure timestamp is correctly typed and set to UTC
+    provided_timestamp = to_datetime(timestamp)
 
     # Query CM API for a pandas dataframe with only one record
-    price_data: pd.DataFrame = cm.get_CM_ReferenceRate(assets="BTC", start=start_time, end=end_time)
+    price_data: pd.DataFrame = cm.get_CM_ReferenceRate(
+        assets="BTC", start=None, end=to_str(provided_timestamp), frequency="1s", limit_per_asset=1, paging_from="end"
+    )
 
     # Get current price closest to the provided timestamp
     btc_price: float = float(price_data["ReferenceRateUSD"].iloc[-1])
@@ -56,22 +55,23 @@ def get_prediction_interval(timestamp: str, point_estimate: float) -> Tuple[floa
     cm = CMData()
 
     # Set the time range to be 24 hours
-    start_time: str = datetime_to_CM_timestamp(iso8601_to_datetime(timestamp) - timedelta(days=1))
-    end_time: str = datetime_to_CM_timestamp(iso8601_to_datetime(timestamp))  # built-ins handle CM API's formatting
+    # Ensure both timestamps are correctly typed and set to UTC
+    start_time = get_before(timestamp, days=1, minutes=0, seconds=0)
+    end_time = to_datetime(timestamp)
 
     # Query CM API for sample standard deviation of the 1s residuals
     historical_price_data: pd.DataFrame = cm.get_CM_ReferenceRate(
-        assets="BTC", start=start_time, end=end_time, frequency="1s"
+        assets="BTC", start=to_str(start_time), end=to_str(end_time), frequency="1s"
     )
     residuals: pd.Series = historical_price_data["ReferenceRateUSD"].diff()
     sample_std_dev: float = float(residuals.std())
 
     # We have the standard deviation of the 1s residuals
-    # We are forecasting forward 5m, which is 300s
-    # We must scale the 1s sample standard deviation to reflect a 300s forecast
+    # We are forecasting forward 60m, which is 3600s
+    # We must scale the 1s sample standard deviation to reflect a 3600s forecast
     # Make reasonable assumptions that the 1s residuals are uncorrelated and normally distributed
     # To do this naively, we multiply the std dev by the square root of the number of time steps
-    time_steps: int = 300
+    time_steps: int = 3600
     naive_forecast_std_dev: float = sample_std_dev * (time_steps**0.5)
 
     # For a 90% prediction interval, we use the coefficient 1.64

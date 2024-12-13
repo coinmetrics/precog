@@ -5,6 +5,11 @@ from precog import __version__
 
 class TestPackage(unittest.TestCase):
 
+    # runs once prior to all tests in this file
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+
+    # runs once prior to every single test
     def setUp(self):
         pass
 

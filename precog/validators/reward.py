@@ -1,4 +1,3 @@
-from datetime import timedelta  # temporary for dummy data
 from typing import List
 
 import bittensor as bt
@@ -8,7 +7,7 @@ from pandas import DataFrame
 from precog.protocol import Challenge
 from precog.utils.cm_data import CMData
 from precog.utils.general import pd_to_dict, rank
-from precog.utils.timestamp import align_timepoints, datetime_to_CM_timestamp, iso8601_to_datetime, mature_dictionary
+from precog.utils.timestamp import align_timepoints, get_before, mature_dictionary, to_datetime, to_str
 
 
 ################################################################################
@@ -24,8 +23,8 @@ def calc_rewards(
     decayed_weights = decay**weights
     timestamp = responses[0].timestamp
     cm = CMData()
-    start_time: str = datetime_to_CM_timestamp(iso8601_to_datetime(timestamp) - timedelta(hours=1))
-    end_time: str = datetime_to_CM_timestamp(iso8601_to_datetime(timestamp))  # built-ins handle CM API's formatting
+    start_time: str = to_str(get_before(timestamp=timestamp, hours=1))
+    end_time: str = to_str(to_datetime(timestamp))  # built-ins handle CM API's formatting
     # Query CM API for sample standard deviation of the 1s residuals
     historical_price_data: DataFrame = cm.get_CM_ReferenceRate(
         assets="BTC", start=start_time, end=end_time, frequency="1s"
