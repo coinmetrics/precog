@@ -51,7 +51,7 @@ class weight_setter:
         self.blocks_since_last_update = self.subtensor.blocks_since_last_update(
             netuid=self.config.netuid, uid=self.my_uid
         )
-        if self.config.wandb_on:
+        if not self.config.wandb.off:
             setup_wandb(self)
         self.stop_event = asyncio.Event()
         bt.logging.info("Setup complete, starting loop")
@@ -106,10 +106,10 @@ class weight_setter:
         for uid, hotkey in enumerate(self.metagraph.hotkeys):
             if (uid not in self.MinerHistory and uid in self.available_uids) or self.hotkeys[uid] != hotkey:
                 bt.logging.info(f"Replacing hotkey on {uid} with {self.metagraph.hotkeys[uid]}")
-                self.hotkeys[uid] = hotkey
-                self.scores[uid] = 0  # hotkey has been replaced
+                self.hotkeys = self.metagraph.hotkeys
                 self.MinerHistory[uid] = MinerHistory(uid, timezone=self.timezone)
                 self.moving_average_scores[uid] = 0
+                self.scores = list(self.moving_average_scores.values())
         self.save_state()
 
     def query_miners(self):
@@ -178,11 +178,11 @@ class weight_setter:
                     bt.logging.error(f"Failed to calculate rewards with error: {e}")
                 # Adjust the scores based on responses from miners and update moving average.
                 for i, value in zip(self.available_uids, rewards):
-                    self.moving_average_scores[i] = (1 - self.config.alpha) * self.moving_average_scores[
-                        i
-                    ] + self.config.alpha * value
+                    self.moving_average_scores[i] = (
+                        1 - self.config.neuron.moving_average_alpha
+                    ) * self.moving_average_scores[i] + self.config.neuron.moving_average_alpha * value
                     self.scores = list(self.moving_average_scores.values())
-                if self.config.wandb_on:
+                if not self.config.wandb.off:
                     log_wandb(responses, rewards, self.available_uids)
             else:
                 print_info(self)

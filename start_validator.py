@@ -1,9 +1,12 @@
+import argparse
 import subprocess
 import time
 
+import bittensor as bt
+
 import precog
-from precog.utils.classes import Config
-from precog.utils.general import get_version, parse_arguments
+from precog.utils.config import add_args, add_validator_args, to_string
+from precog.utils.general import get_version
 
 webhook_url = ""
 current_version = precog.__version__
@@ -12,7 +15,7 @@ current_version = precog.__version__
 def update_and_restart(config):
     global current_version
     start_command = ["pm2", "start", "--name", f"{config.neuron.name}"]
-    arguments = "python3 -m precog.validators.validator" + config.to_str()
+    arguments = "python3 -m precog.validators.validator " + to_string(config)
 
     start_command.append(arguments)
     subprocess.run(start_command)
@@ -34,8 +37,10 @@ def update_and_restart(config):
 
 
 if __name__ == "__main__":
-    args = parse_arguments()
-    config = Config(args)
+    parser = argparse.ArgumentParser()
+    add_args(parser)
+    add_validator_args(parser)
+    config = bt.config(parser)
     try:
         update_and_restart(config)
     except Exception as e:

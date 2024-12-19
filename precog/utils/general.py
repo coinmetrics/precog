@@ -13,7 +13,7 @@ from pandas import DataFrame
 from precog.utils.classes import NestedNamespace
 
 
-def parse_arguments(parser: Optional[argparse.ArgumentParser] = None):
+def parse_arguments(parser: Optional[argparse.ArgumentParser] = None, as_parser: bool = False):
     """Used to overwrite defaults when params are passed into the script.
 
     Args:
@@ -65,7 +65,10 @@ def parse_arguments(parser: Optional[argparse.ArgumentParser] = None):
     parser.add_argument("--timeout", type=int, default=16, help="allowable nonce delay time (seconds)")
     parser.add_argument("--print_cadence", type=float, default=12, help="how often to print stats (seconds)")
     parser.add_argument("--forward_function", type=str, default="forward", help="name of the forward function to use")
-    return parser.parse_args(namespace=NestedNamespace())
+    if as_parser:
+        return parser
+    else:
+        return parser.parse_args(namespace=NestedNamespace())
 
 
 def get_version() -> Optional[str]:

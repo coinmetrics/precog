@@ -14,7 +14,7 @@ readme = "README.md"
 python = ">= 3.9, < 3.12"
 
 # Bittensor Version Strict
-bittensor = "8.3.1"
+bittensor = "8.5.1"
 
 # Bittensor Dependencies We Also Need
 setuptools = "~70.0.0"
