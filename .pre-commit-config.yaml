@@ -61,7 +61,7 @@ repos:
           language: system
           stages: [pre-commit, pre-push, manual]
           minimum_pre_commit_version: 3.2.0
-          args: ['--maxkb=500']
+          args: ['--maxkb=500000']
       -   id: check-ast
           name: check python ast
           description: simply checks whether the files parse as valid python.

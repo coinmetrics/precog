@@ -118,7 +118,7 @@ make validator
 
 
 ## Incentive Mechanism
-Incentive mechanism whitepaper coming soon.
+Read the [Incentive mechanism whitepaper](https://github.com/coinmetrics/precog/tree/master/docs/precog_Incentive_mechanism.pdf) for an in-depth explanation of the mechanism.
 
 Briefly, miners are rewarded based on two factors:
 1. A point estimate for the price of BTC in USD one hour from prediction time
