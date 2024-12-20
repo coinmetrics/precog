@@ -142,7 +142,7 @@ class weight_setter:
                 wallet=self.wallet,
                 uids=uint_uids,
                 weights=uint_weights,
-                wait_for_inclusion=True,
+                wait_for_inclusion=False,
                 version_key=__spec_version__,
             )
             if result:
