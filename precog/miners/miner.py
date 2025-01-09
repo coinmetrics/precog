@@ -1,4 +1,3 @@
-import argparse
 import asyncio
 import importlib
 import time
@@ -11,7 +10,8 @@ from substrateinterface import Keypair, SubstrateInterface
 
 from precog.protocol import Challenge
 from precog.utils.bittensor import print_info, setup_bittensor_objects
-from precog.utils.config import config
+from precog.utils.classes import Config
+from precog.utils.general import parse_arguments
 
 
 class Miner:
@@ -20,6 +20,8 @@ class Miner:
     """
 
     def __init__(self, config=None):
+        args = parse_arguments()
+        config = Config(args)
         self.forward_module = importlib.import_module(f"precog.miners.{config.forward_function}")
         self.config = config
         self.config.neuron.type = "Miner"
@@ -214,7 +216,7 @@ class Miner:
 
 # Run the miner
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    config = config(parser, neuron_type="miner")
+    args = parse_arguments()
+    config = Config(args)
     miner = Miner(config=config)
     miner.loop.run_forever()

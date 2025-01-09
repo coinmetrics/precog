@@ -20,12 +20,7 @@ def setup_bittensor_objects(self):
         )[1]
     else:
         # if chain endpoint is set, overwrite network arg
-        if "test" in self.config.subtensor.chain_endpoint:
-            self.config.subtensor.network = "test"
-        elif "finney" in self.config.subtensor.chain_endpoint:
-            self.config.subtensor.network = "finney"
-        else:
-            self.config.subtensor.network = self.config.subtensor.chain_endpoint
+        self.config.subtensor.network = self.config.subtensor.chain_endpoint
     # Initialize subtensor.
     self.subtensor = bt.subtensor(config=self.config, network=self.config.subtensor.chain_endpoint)
     self.metagraph = self.subtensor.metagraph(self.config.netuid)
@@ -73,7 +68,6 @@ def setup_bittensor_objects(self):
     ).expanduser()
     full_path.mkdir(parents=True, exist_ok=True)
     self.config.full_path = str(full_path)
-    bt.logging.info(f"Config: {self.config}")
 
 
 def print_info(self) -> None:
@@ -89,7 +83,7 @@ def print_info(self) -> None:
             f"VTrust:{self.metagraph.Tv[self.my_uid]:.3f} | "
             f"Dividend:{self.metagraph.D[self.my_uid]:.3f} | "
             f"Emission:{self.metagraph.E[self.my_uid]:.3f} | "
-            f"Setting weights in {weight_timing} blocks"
+            f"Seting weights in {weight_timing} blocks"
         )
     elif self.config.neuron.type == "Miner":
         log = (

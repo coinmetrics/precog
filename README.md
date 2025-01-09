@@ -71,6 +71,17 @@ poetry install
 ## Configuration
 
 ### Makefile
+Start by editing the Makefile with your wallet and network information:
+```
+################################################################################
+#                               User Parameters                                #
+################################################################################
+coldkey = default
+validator_hotkey = validator
+miner_hotkey = miner
+netuid = $(testnet_netuid)
+network = $(testnet)
+```
 
 ### .env Files
 Copy the example `.env` files and edit all desired values:

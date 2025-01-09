@@ -1,7 +1,56 @@
+import argparse
 from datetime import datetime, timedelta
 from typing import List
 
 from precog.utils.timestamp import get_now, get_timezone, round_minute_down, to_datetime
+
+
+class Config:
+    def __init__(self, args):
+        # Add command-line arguments to the Config object
+        for key, value in vars(args).items():
+            setattr(self, key, value)
+
+    def get(self, key, default=None):
+        return getattr(self, key, default)
+
+    def to_str(self):
+        arguments = ""
+        for key, value in vars(self).items():
+            if isinstance(value, bool):
+                if value:
+                    arguments = arguments + f" --{key}"
+            else:
+                try:
+                    if isinstance(value, NestedNamespace):
+                        for key_2, value_2 in vars(value).items():
+                            if isinstance(value_2, bool):
+                                if value_2:
+                                    arguments = arguments + f" --{key}.{key_2}"
+                            else:
+                                arguments = arguments + f" --{key}.{key_2} {value_2}"
+                    else:
+                        arguments = arguments + (f" --{key} {value}")
+                except Exception:
+                    continue
+        return arguments
+
+
+class NestedNamespace(argparse.Namespace):
+    def __setattr__(self, name, value):
+        if "." in name:
+            group, name = name.split(".", 1)
+            ns = getattr(self, group, NestedNamespace())
+            setattr(ns, name, value)
+            self.__dict__[group] = ns
+        else:
+            self.__dict__[name] = value
+
+    def get(self, key, default=None):
+        if "." in key:
+            group, key = key.split(".", 1)
+            return getattr(self, group, NestedNamespace()).get(key, default)
+        return self.__dict__.get(key, default)
 
 
 class MinerHistory:
