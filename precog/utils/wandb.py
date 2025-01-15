@@ -1,6 +1,7 @@
 import os
 
 import wandb
+from precog import __version__
 
 
 def setup_wandb(self) -> None:
@@ -8,13 +9,13 @@ def setup_wandb(self) -> None:
     if wandb_api_key is not None:
         wandb.init(
             project=f"sn{self.config.netuid}-validators",
-            entity="",
+            entity="coinmetrics-precog",
             config={
                 "hotkey": self.wallet.hotkey.ss58_address,
             },
-            name=f"validator-{self.my_uid}-{'0.0.1'}",
+            name=f"validator-{self.uid}-{__version__}",
             resume="auto",
-            dir=self.config.full_path,
+            dir=self.config.neuron.full_path,
             reinit=True,
         )
     else:
