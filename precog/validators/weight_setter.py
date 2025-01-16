@@ -22,7 +22,6 @@ class weight_setter:
         self.config = config
         self.loop = loop
         self.lock = asyncio.Lock()
-        self.uid = self.metagraph.hotkeys.index(self.wallet.hotkey.ss58_address)
         setup_bittensor_objects(self)
         self.timezone = timezone("UTC")
         self.prediction_interval = self.config.prediction_interval  # in seconds

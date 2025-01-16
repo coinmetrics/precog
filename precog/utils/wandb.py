@@ -14,7 +14,7 @@ def setup_wandb(self) -> None:
             config={
                 "hotkey": self.wallet.hotkey.ss58_address,
             },
-            name=f"validator-{self.uid}-{__version__}",
+            name=f"validator-{self.my_uid}-{__version__}",
             resume="auto",
             dir=self.config.neuron.full_path,
             reinit=True,
