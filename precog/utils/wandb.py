@@ -1,6 +1,7 @@
 import os
 
 import wandb
+import bittensor as bt
 from precog import __version__
 
 
@@ -19,7 +20,7 @@ def setup_wandb(self) -> None:
             reinit=True,
         )
     else:
-        print("WANDB_API_KEY not found in environment variables.")
+        bt.logging.error("WANDB_API_KEY not found in environment variables.")
 
 
 def log_wandb(responses, rewards, miner_uids):
