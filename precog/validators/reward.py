@@ -45,7 +45,7 @@ def calc_rewards(
         if any([np.isnan(inters).any(), np.isnan(interval_prices).any()]):
             interval_errors.append(0)
         else:
-            interval_errors.append(interval_error(inters, interval_prices))
+            interval_errors.append(interval_error(inters, interval_prices, aligned_int_timestamps))
         bt.logging.debug(f"UID: {uid} | point_errors: {point_errors[-1]} | interval_errors: {interval_errors[-1]}")
 
     point_ranks = rank(np.array(point_errors))
