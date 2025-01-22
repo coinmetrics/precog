@@ -70,20 +70,25 @@ def interval_error(intervals, cm_prices, timestamps=None):
             effective_max = np.min([upper_bound_prediction, np.max(future_prices)])
             f_w = (effective_max - effective_min) / (upper_bound_prediction - lower_bound_prediction)
             # print(f"f_w: {f_w} | t: {effective_max} | b: {effective_min} | _pmax: {upper_bound_prediction} | _pmin: {lower_bound_prediction}")
-            f_i = sum(
-                (future_prices >= lower_bound_prediction) & (future_prices <= upper_bound_prediction)
-            ) / len(cm_prices[i + 1 :])
+            inside_mask = (future_prices >= lower_bound_prediction) & (future_prices <= upper_bound_prediction)
+            percent_inside = (np.sum(inside_mask) / len(future_prices)) * 100
+            percent_outside = 100 - percent_inside
+            
+            f_i = percent_inside / 100
 
-            bt.logging.debug(f"""
-            Timestamp: {ts}
-            Interval Bounds: [{lower_bound_prediction:.2f}, {upper_bound_prediction:.2f}]
-            Future Prices Range: [{np.min(future_prices):.2f}, {np.max(future_prices):.2f}]
-            Effective Range: [{effective_min:.2f}, {effective_max:.2f}]
-            Width Factor: {f_w:.4f}
-            Inclusion Factor: {f_i:.4f}
-            Error Score: {f_w * f_i:.4f}
-            Number of Future Prices: {len(future_prices)}
-            """)
+            if i == 0:
+                bt.logging.debug(f"""
+                timestamp: {ts}
+                upper_bound: {upper_bound_prediction}
+                lower_bound: {lower_bound_prediction}
+                price_max_interval: {np.max(future_prices)}
+                price_min_interval: {np.min(future_prices)}
+                percent_inside: {percent_inside:.2f}%
+                percent_outside: {percent_outside:.2f}%
+                width_factor: {f_w:.4f}
+                inclusion_factor: {f_i:.4f}
+                interval_score: {f_w * f_i:.4f}
+                """)
 
             interval_errors.append(f_w * f_i)
             # print(f"lower: {lower_bound_prediction} | upper: {upper_bound_prediction} | cm_prices: {cm_prices[i:]} | error: {f_w * f_i}")
