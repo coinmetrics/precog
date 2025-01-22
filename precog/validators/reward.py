@@ -114,5 +114,5 @@ actual_price: {cm_prices[0]}
 absolute_error: {absolute_errors[0]:.2f}
 relative_error: {relative_errors[0]:.4f}
 mean_relative_error: {point_error:.4f}
-predictions: {predictions}"""
+predictions: {predictions}""")
     return point_error.item()
