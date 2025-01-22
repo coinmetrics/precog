@@ -36,17 +36,17 @@ def calc_rewards(
         prediction_dict, interval_dict = current_miner.format_predictions(response.timestamp)
         mature_time_dict = mature_dictionary(prediction_dict)
         preds, price, aligned_pred_timestamps = align_timepoints(mature_time_dict, cm_data)
-        for i, j, k in zip(preds, price, aligned_pred_timestamps):
-            bt.logging.debug(f"Prediction: {i} | Price: {j} | Aligned Prediction: {k}")
+        # for i, j, k in zip(preds, price, aligned_pred_timestamps):
+        #     bt.logging.debug(f"Prediction: {i} | Price: {j} | Aligned Prediction: {k}")
         inters, interval_prices, aligned_int_timestamps = align_timepoints(interval_dict, cm_data)
-        for i, j, k in zip(inters, interval_prices, aligned_int_timestamps):
-            bt.logging.debug(f"Interval: {i} | Interval Price: {j} | Aligned TS: {k}")
+        # for i, j, k in zip(inters, interval_prices, aligned_int_timestamps):
+        #     bt.logging.debug(f"Interval: {i} | Interval Price: {j} | Aligned TS: {k}")
         point_errors.append(point_error(preds, price))
         if any([np.isnan(inters).any(), np.isnan(interval_prices).any()]):
             interval_errors.append(0)
         else:
             interval_errors.append(interval_error(inters, interval_prices, aligned_int_timestamps))
-        bt.logging.debug(f"UID: {uid} | point_errors: {point_errors[-1]} | interval_errors: {interval_errors[-1]}")
+        bt.logging.debug(f"UID: {uid} | current_point_error: {point_errors[-1]} | current_interval_error: {interval_errors[-1]}")
 
     point_ranks = rank(np.array(point_errors))
     interval_ranks = rank(-np.array(interval_errors))  # 1 is best, 0 is worst, so flip it
@@ -77,7 +77,8 @@ def interval_error(intervals, cm_prices, timestamps=None):
             f_i = percent_inside / 100
 
             if i == 0:
-                bt.logging.debug(f"""
+                bt.logging.debug(
+                f"""
                 timestamp: {ts}
                 upper_bound: {upper_bound_prediction}
                 lower_bound: {lower_bound_prediction}
@@ -88,6 +89,7 @@ def interval_error(intervals, cm_prices, timestamps=None):
                 width_factor: {f_w:.4f}
                 inclusion_factor: {f_i:.4f}
                 interval_score: {f_w * f_i:.4f}
+                prices: {cm_prices[i:]}
                 """)
 
             interval_errors.append(f_w * f_i)
