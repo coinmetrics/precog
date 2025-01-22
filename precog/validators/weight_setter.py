@@ -178,8 +178,6 @@ class weight_setter:
             if not weights:
                 bt.logging.error("No weights to set, skipping")
                 return
-            for i, j in zip(weights, self.available_uids):
-                bt.logging.debug(f"UID: {j}  |  Weight: {i}")
             if sum(weights) == 0:
                 weights = [1] * len(weights)
             # Convert to uint16 weights and uids.
@@ -187,6 +185,8 @@ class weight_setter:
                 uint_uids,
                 uint_weights,
             ) = bt.utils.weight_utils.convert_weights_and_uids_for_emit(uids=uids, weights=array(weights))
+            for i, j in zip(uint_weights, uint_uids):
+                bt.logging.debug(f"UID: {j}  |  Weight: {i}")
             # Update the incentive mechanism on the Bittensor blockchain.
             result, msg = self.subtensor.set_weights(
                 netuid=self.config.netuid,
