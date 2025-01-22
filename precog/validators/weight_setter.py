@@ -147,15 +147,23 @@ class weight_setter:
         # Save updated state
         self.save_state()
 
-    def query_miners(self):
+    async def query_miners(self):
         timestamp = get_str()
         synapse = Challenge(timestamp=timestamp)
+        # start_time = self.loop.time()
+        # responses = self.dendrite.query(
+        #     # Send the query to selected miner axons in the network.
+        #     axons=[self.metagraph.axons[uid] for uid in self.available_uids],
+        #     synapse=synapse,
+        #     deserialize=False,
+        # )
+        # query_time = self.loop.time() - start_time
+        # bt.logging.info(f"Query took {query_time:.2f} seconds")
         start_time = self.loop.time()
-        responses = self.dendrite.query(
-            # Send the query to selected miner axons in the network.
+        responses = await self.dendrite.forward(
             axons=[self.metagraph.axons[uid] for uid in self.available_uids],
             synapse=synapse,
-            deserialize=False,
+            deserialize=False
         )
         query_time = self.loop.time() - start_time
         bt.logging.info(f"Query took {query_time:.2f} seconds")
@@ -219,7 +227,7 @@ class weight_setter:
             await asyncio.sleep(600)
         else:
             if is_query_time(self.prediction_interval, self.timestamp) or query_lag >= 60 * self.prediction_interval:
-                responses, self.timestamp = self.query_miners()
+                responses, self.timestamp = await self.query_miners()
                 try:
                     bt.logging.debug(f"Processing responses for UIDs: {self.available_uids}")
                     bt.logging.debug(f"Number of responses: {len(responses)}")
