@@ -36,17 +36,55 @@ def calc_rewards(
         prediction_dict, interval_dict = current_miner.format_predictions(response.timestamp)
         mature_time_dict = mature_dictionary(prediction_dict)
         preds, price, aligned_pred_timestamps = align_timepoints(mature_time_dict, cm_data)
-        # for i, j, k in zip(preds, price, aligned_pred_timestamps):
-        #     bt.logging.debug(f"Prediction: {i} | Price: {j} | Aligned Prediction: {k}")
         inters, interval_prices, aligned_int_timestamps = align_timepoints(interval_dict, cm_data)
-        # for i, j, k in zip(inters, interval_prices, aligned_int_timestamps):
-        #     bt.logging.debug(f"Interval: {i} | Interval Price: {j} | Aligned TS: {k}")
-        point_errors.append(point_error(preds, price))
-        if any([np.isnan(inters).any(), np.isnan(interval_prices).any()]):
-            interval_errors.append(0)
+
+        # Calculate point error metrics
+        if preds is not None and len(preds) > 0:
+            absolute_errors = np.abs(np.array(preds) - np.array(price))
+            relative_errors = absolute_errors / np.array(price)
+            current_point_error = np.mean(relative_errors)
         else:
-            interval_errors.append(interval_error(inters, interval_prices, aligned_int_timestamps))
-        bt.logging.debug(f"UID: {uid} | current_point_error: {point_errors[-1]} | current_interval_error: {interval_errors[-1]}")
+            current_point_error = np.inf
+
+        # Calculate interval error metrics
+        if not any([np.isnan(inters).any(), np.isnan(interval_prices).any()]):
+            lower_bound = np.min(inters[0])
+            upper_bound = np.max(inters[0])
+            future_prices = interval_prices[1:]
+            
+            effective_min = np.max([lower_bound, np.min(future_prices)])
+            effective_max = np.min([upper_bound, np.max(future_prices)])
+            f_w = (effective_max - effective_min) / (upper_bound - lower_bound)
+            
+            inside_mask = (future_prices >= lower_bound) & (future_prices <= upper_bound)
+            percent_inside = (np.sum(inside_mask) / len(future_prices)) * 100
+            current_interval_error = f_w * (percent_inside / 100)
+        else:
+            current_interval_error = 0
+
+        bt.logging.debug("")  # Add blank line
+        bt.logging.debug(f"""uid: {uid}
+timestamp: {aligned_pred_timestamps[0] if aligned_pred_timestamps else 'N/A'}
+
+Point Prediction Metrics:
+prediction: {preds[0] if preds is not None and len(preds) > 0 else 'N/A'}
+actual_price: {price[0] if len(price) > 0 else 'N/A'}
+absolute_error: {absolute_errors[0]:.2f if preds is not None and len(preds) > 0 else 'N/A'}
+relative_error: {relative_errors[0]:.4f if preds is not None and len(preds) > 0 else 'N/A'}
+point_error_score: {current_point_error:.4f}
+
+Interval Prediction Metrics:
+upper_bound: {upper_bound if 'upper_bound' in locals() else 'N/A'}
+lower_bound: {lower_bound if 'lower_bound' in locals() else 'N/A'}
+price_max_interval: {np.max(future_prices) if 'future_prices' in locals() else 'N/A'}
+price_min_interval: {np.min(future_prices) if 'future_prices' in locals() else 'N/A'}
+percent_inside: {percent_inside:.2f if 'percent_inside' in locals() else 'N/A'}%
+percent_outside: {(100 - percent_inside):.2f if 'percent_inside' in locals() else 'N/A'}%
+width_factor: {f_w:.4f if 'f_w' in locals() else 'N/A'}
+interval_error_score: {current_interval_error:.4f}""")
+
+        point_errors.append(current_point_error)
+        interval_errors.append(current_interval_error)
 
     point_ranks = rank(np.array(point_errors))
     interval_ranks = rank(-np.array(interval_errors))  # 1 is best, 0 is worst, so flip it
@@ -76,22 +114,6 @@ def interval_error(intervals, cm_prices, timestamps=None):
             
             f_i = percent_inside / 100
 
-            if i == 0:
-                bt.logging.debug(f"""
-
-timestamp: {ts}
-upper_bound: {upper_bound_prediction}
-lower_bound: {lower_bound_prediction}
-price_max_interval: {np.max(future_prices)}
-price_min_interval: {np.min(future_prices)}
-percent_inside: {percent_inside:.2f}%
-percent_outside: {percent_outside:.2f}%
-width_factor: {f_w:.4f}
-inclusion_factor: {f_i:.4f}
-interval_score: {f_w * f_i:.4f}
-prices: {cm_prices[i:]}
-""")
-
             interval_errors.append(f_w * f_i)
             # print(f"lower: {lower_bound_prediction} | upper: {upper_bound_prediction} | cm_prices: {cm_prices[i:]} | error: {f_w * f_i}")
         if len(interval_errors) == 1:
@@ -108,12 +130,4 @@ def point_error(predictions, cm_prices) -> np.ndarray:
         absolute_errors = np.abs(np.array(predictions) - np.array(cm_prices))
         relative_errors = absolute_errors / np.array(cm_prices)
         point_error = np.mean(relative_errors)
-        if len(predictions) > 0:
-            bt.logging.debug(f"""
-prediction: {predictions[0]}
-actual_price: {cm_prices[0]}
-absolute_error: {absolute_errors[0]:.2f}
-relative_error: {relative_errors[0]:.4f}
-mean_relative_error: {point_error:.4f}
-predictions: {predictions}""")
     return point_error.item()
