@@ -61,11 +61,8 @@ def calc_rewards(
             inside_mask = (future_prices >= lower_bound) & (future_prices <= upper_bound)
             percent_inside = (np.sum(inside_mask) / len(future_prices)) * 100
             current_interval_error = f_w * (percent_inside / 100)
-        else:
-            current_interval_error = 0
-
-        bt.logging.debug("")  # Add blank line
-        bt.logging.debug(f"""uid: {uid}
+            bt.logging.debug("")  # Add blank line
+            bt.logging.debug(f"""uid: {uid}
 timestamp: {aligned_pred_timestamps[0] if aligned_pred_timestamps else 'N/A'}
 
 Point Prediction Metrics:
@@ -84,6 +81,8 @@ percent_inside: {percent_inside:.2f if 'percent_inside' in locals() else 'N/A'}%
 percent_outside: {(100 - percent_inside):.2f if 'percent_inside' in locals() else 'N/A'}%
 width_factor: {f_w:.4f if 'f_w' in locals() else 'N/A'}
 interval_error_score: {current_interval_error:.4f}""")
+        else:
+            current_interval_error = 0
 
         point_errors.append(current_point_error)
         interval_errors.append(current_interval_error)
