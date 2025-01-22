@@ -77,20 +77,19 @@ def interval_error(intervals, cm_prices, timestamps=None):
             f_i = percent_inside / 100
 
             if i == 0:
-                bt.logging.debug(
-                f"""
-                timestamp: {ts}
-                upper_bound: {upper_bound_prediction}
-                lower_bound: {lower_bound_prediction}
-                price_max_interval: {np.max(future_prices)}
-                price_min_interval: {np.min(future_prices)}
-                percent_inside: {percent_inside:.2f}%
-                percent_outside: {percent_outside:.2f}%
-                width_factor: {f_w:.4f}
-                inclusion_factor: {f_i:.4f}
-                interval_score: {f_w * f_i:.4f}
-                prices: {cm_prices[i:]}
-                """)
+                bt.logging.debug(f"""
+timestamp: {ts}
+upper_bound: {upper_bound_prediction}
+lower_bound: {lower_bound_prediction}
+price_max_interval: {np.max(future_prices)}
+price_min_interval: {np.min(future_prices)}
+percent_inside: {percent_inside:.2f}%
+percent_outside: {percent_outside:.2f}%
+width_factor: {f_w:.4f}
+inclusion_factor: {f_i:.4f}
+interval_score: {f_w * f_i:.4f}
+prices: {cm_prices[i:]}
+""")
 
             interval_errors.append(f_w * f_i)
             # print(f"lower: {lower_bound_prediction} | upper: {upper_bound_prediction} | cm_prices: {cm_prices[i:]} | error: {f_w * f_i}")
