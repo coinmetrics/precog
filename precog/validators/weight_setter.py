@@ -6,6 +6,7 @@ import bittensor as bt
 import websocket
 from numpy import array
 from pytz import timezone
+import time
 
 from precog import __spec_version__
 from precog.protocol import Challenge
@@ -149,12 +150,15 @@ class weight_setter:
     def query_miners(self):
         timestamp = get_str()
         synapse = Challenge(timestamp=timestamp)
+        start_time = self.loop.time()
         responses = self.dendrite.query(
             # Send the query to selected miner axons in the network.
             axons=[self.metagraph.axons[uid] for uid in self.available_uids],
             synapse=synapse,
             deserialize=False,
         )
+        query_time = self.loop.time() - start_time
+        bt.logging.info(f"Query took {query_time:.2f} seconds")
         return responses, timestamp
 
     async def set_weights(self):
