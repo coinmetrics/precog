@@ -59,3 +59,31 @@ def get_prediction_interval(timestamp: str, point_estimate: float) -> Tuple[floa
    bt.logging.debug(f"Interval times - Init: {init_time:.3f}s, Parse: {parse_time:.3f}s, "
                    f"API: {api_time:.3f}s, Calc: {calc_time:.3f}s")
    return lower_bound, upper_bound
+
+
+def forward(synapse: Challenge) -> Challenge:
+   start_time = time.perf_counter()
+   
+   bt.logging.info(
+       f"👈 Received prediction request from: {synapse.dendrite.hotkey} for timestamp: {synapse.timestamp}"
+   )
+
+   point_estimate: float = get_point_estimate(timestamp=synapse.timestamp)
+   point_time = time.perf_counter() - start_time
+   
+   prediction_interval: Tuple[float, float] = get_prediction_interval(
+       timestamp=synapse.timestamp, point_estimate=point_estimate
+   )
+   interval_time = time.perf_counter() - start_time - point_time
+
+   synapse.prediction = point_estimate
+   synapse.interval = prediction_interval
+
+   total_time = time.perf_counter() - start_time
+   bt.logging.info(f"Times - Point: {point_time:.3f}s, Interval: {interval_time:.3f}s, Total: {total_time:.3f}s")
+
+   if synapse.prediction is not None:
+       bt.logging.success(f"Predicted price: {synapse.prediction}  |  Predicted Interval: {synapse.interval}")
+   else:
+       bt.logging.info("No prediction for this request.")
+   return synapse
