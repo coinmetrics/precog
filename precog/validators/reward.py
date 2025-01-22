@@ -43,6 +43,15 @@ def calc_rewards(
             absolute_errors = np.abs(np.array(preds) - np.array(price))
             relative_errors = absolute_errors / np.array(price)
             current_point_error = np.mean(relative_errors)
+            bt.logging.debug(f"""uid: {uid}
+timestamp: {aligned_pred_timestamps[0] if aligned_pred_timestamps else 'N/A'}
+
+Point Prediction Metrics:
+prediction: {preds[0] if preds is not None and len(preds) > 0 else 'N/A'}
+actual_price: {price[0] if len(price) > 0 else 'N/A'}
+absolute_error: {absolute_errors[0]:.2f if absolute_errors is not None else 'N/A'}
+relative_error: {relative_errors[0]:.4f if relative_errors is not None and len(preds) > 0 else 'N/A'}
+point_error_score: {current_point_error:.4f}""")
         else:
             current_point_error = np.inf
             absolute_errors = None
@@ -61,17 +70,8 @@ def calc_rewards(
             inside_mask = (future_prices >= lower_bound) & (future_prices <= upper_bound)
             percent_inside = (np.sum(inside_mask) / len(future_prices)) * 100
             current_interval_error = f_w * (percent_inside / 100)
-            bt.logging.debug("")  # Add blank line
-            bt.logging.debug(f"""uid: {uid}
-timestamp: {aligned_pred_timestamps[0] if aligned_pred_timestamps else 'N/A'}
-
-Point Prediction Metrics:
-prediction: {preds[0] if preds is not None and len(preds) > 0 else 'N/A'}
-actual_price: {price[0] if len(price) > 0 else 'N/A'}
-absolute_error: {absolute_errors[0]:.2f if absolute_errors is not None else 'N/A'}
-relative_error: {relative_errors[0]:.4f if relative_errors is not None and len(preds) > 0 else 'N/A'}
-point_error_score: {current_point_error:.4f}
-
+            bt.logging.debug("")
+            bt.logging.debug(f"""Interval Prediction Metrics:
 Interval Prediction Metrics:
 upper_bound: {upper_bound if 'upper_bound' in locals() else 'N/A'}
 lower_bound: {lower_bound if 'lower_bound' in locals() else 'N/A'}
