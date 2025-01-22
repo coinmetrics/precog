@@ -79,8 +79,7 @@ def func_with_retry(func: Callable, max_attempts: int = 3, delay: float = 1, *ar
             if attempt == max_attempts:
                 bt.logging.error(f"Function {func} failed {max_attempts} times, skipping.")
                 raise
-            else:
-                asyncio.sleep(delay)
+            await asyncio.sleep(delay)
 
 
 def pd_to_dict(data: DataFrame) -> dict:
