@@ -49,8 +49,8 @@ timestamp: {aligned_pred_timestamps[0] if aligned_pred_timestamps else 'N/A'}
 Point Prediction Metrics:
 prediction: {preds[0] if preds is not None and len(preds) > 0 else 'N/A'}
 actual_price: {price[0] if len(price) > 0 else 'N/A'}
-absolute_error: {absolute_errors[0]:.2f if absolute_errors is not None else 'N/A'}
-relative_error: {relative_errors[0]:.4f if relative_errors is not None and len(preds) > 0 else 'N/A'}
+absolute_error: {absolute_errors[0] if absolute_errors is not None else 'N/A'}
+relative_error: {relative_errors[0] if relative_errors is not None and len(preds) > 0 else 'N/A'}
 point_error_score: {current_point_error:.4f}""")
         else:
             current_point_error = np.inf
@@ -77,10 +77,10 @@ upper_bound: {upper_bound if 'upper_bound' in locals() else 'N/A'}
 lower_bound: {lower_bound if 'lower_bound' in locals() else 'N/A'}
 price_max_interval: {np.max(future_prices) if 'future_prices' in locals() else 'N/A'}
 price_min_interval: {np.min(future_prices) if 'future_prices' in locals() else 'N/A'}
-percent_inside: {percent_inside:.2f if 'percent_inside' in locals() else 'N/A'}%
-percent_outside: {(100 - percent_inside):.2f if 'percent_inside' in locals() else 'N/A'}%
-width_factor: {f_w:.4f if 'f_w' in locals() else 'N/A'}
-interval_error_score: {current_interval_error:.4f}""")
+percent_inside: {percent_inside if 'percent_inside' in locals() else 'N/A'}%
+percent_outside: {(100 - percent_inside) if 'percent_inside' in locals() else 'N/A'}%
+width_factor: {f_w if 'f_w' in locals() else 'N/A'}
+interval_error_score: {current_interval_error}""")
         else:
             current_interval_error = 0
 
