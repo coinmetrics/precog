@@ -78,7 +78,7 @@ def interval_error(intervals, cm_prices, timestamps=None):
 
             if i == 0:
                 bt.logging.debug(f"""
-                
+
 timestamp: {ts}
 upper_bound: {upper_bound_prediction}
 lower_bound: {lower_bound_prediction}
@@ -105,5 +105,14 @@ def point_error(predictions, cm_prices) -> np.ndarray:
     if predictions is None:
         point_error = np.inf
     else:
-        point_error = np.mean(np.abs(np.array(predictions) - np.array(cm_prices)) / np.array(cm_prices))
+        absolute_errors = np.abs(np.array(predictions) - np.array(cm_prices))
+        relative_errors = absolute_errors / np.array(cm_prices)
+        point_error = np.mean(relative_errors)
+        bt.logging.debug(f"""
+prediction: {predictions[0]}
+actual_price: {cm_prices[0]}
+absolute_error: {absolute_errors[0]:.2f}
+relative_error: {relative_errors[0]:.4f}
+mean_relative_error: {point_error:.4f}
+predictions: {predictions}"""
     return point_error.item()
