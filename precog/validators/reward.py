@@ -108,7 +108,8 @@ def point_error(predictions, cm_prices) -> np.ndarray:
         absolute_errors = np.abs(np.array(predictions) - np.array(cm_prices))
         relative_errors = absolute_errors / np.array(cm_prices)
         point_error = np.mean(relative_errors)
-        bt.logging.debug(f"""
+        if len(predictions) > 0:
+            bt.logging.debug(f"""
 prediction: {predictions[0]}
 actual_price: {cm_prices[0]}
 absolute_error: {absolute_errors[0]:.2f}
