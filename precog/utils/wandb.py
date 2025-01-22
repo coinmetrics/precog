@@ -28,7 +28,8 @@ def log_wandb(responses, rewards, miner_uids):
     wandb_val_log = {
         "miners_info": {
             miner_uid: {
-                "miner_response": response.prediction,
+                "miner_prediction": response.prediction,
+                "miner_interval": response.interval,
                 "miner_reward": reward,
             }
             for miner_uid, response, reward in zip(miner_uids, responses, rewards.tolist())
