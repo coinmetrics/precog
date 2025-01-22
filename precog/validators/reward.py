@@ -47,7 +47,7 @@ def calc_rewards(
             current_point_error = np.inf
 
         # Calculate interval error metrics
-        if not any([np.isnan(inters).any(), np.isnan(interval_prices).any()]):
+        if not any([np.isnan(inters).any(), np.isnan(interval_prices).any()]) and len(inters) > 0:
             lower_bound = np.min(inters[0])
             upper_bound = np.max(inters[0])
             future_prices = interval_prices[1:]
