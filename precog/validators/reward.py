@@ -71,8 +71,8 @@ timestamp: {aligned_pred_timestamps[0] if aligned_pred_timestamps else 'N/A'}
 Point Prediction Metrics:
 prediction: {preds[0] if preds is not None and len(preds) > 0 else 'N/A'}
 actual_price: {price[0] if len(price) > 0 else 'N/A'}
-absolute_error: {absolute_errors[0]:.2f if preds is not None and len(preds) > 0 else 'N/A'}
-relative_error: {relative_errors[0]:.4f if preds is not None and len(preds) > 0 else 'N/A'}
+absolute_error: {absolute_errors[0]:.2f if absolute_errors is not None else 'N/A'}
+relative_error: {relative_errors[0]:.4f if relative_errors is not None and len(preds) > 0 else 'N/A'}
 point_error_score: {current_point_error:.4f}
 
 Interval Prediction Metrics:
