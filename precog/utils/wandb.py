@@ -1,8 +1,8 @@
 import os
 
 import bittensor as bt
+import constants
 import wandb
-from constants import WANDB_PROJECT
 
 from precog import __version__
 
@@ -12,7 +12,7 @@ def setup_wandb(self) -> None:
     if wandb_api_key is not None:
         wandb.init(
             project=f"sn{self.config.netuid}-validators",
-            entity=WANDB_PROJECT,
+            entity=constants.WANDB_PROJECT,
             config={
                 "hotkey": self.wallet.hotkey.ss58_address,
             },
