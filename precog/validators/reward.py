@@ -45,6 +45,8 @@ def calc_rewards(
             current_point_error = np.mean(relative_errors)
         else:
             current_point_error = np.inf
+            absolute_errors = None
+            relative_errors = None
 
         # Calculate interval error metrics
         if not any([np.isnan(inters).any(), np.isnan(interval_prices).any()]) and len(inters) > 0:
