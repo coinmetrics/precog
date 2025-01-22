@@ -77,7 +77,8 @@ def interval_error(intervals, cm_prices, timestamps=None):
             f_i = percent_inside / 100
 
             if i == 0:
-                bt.logging.debug("\n" +f"""
+                bt.logging.debug(f"""
+                
 timestamp: {ts}
 upper_bound: {upper_bound_prediction}
 lower_bound: {lower_bound_prediction}
