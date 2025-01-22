@@ -1,7 +1,7 @@
 import os
 
 import bittensor as bt
-import constants
+from precog import constants
 import wandb
 
 from precog import __version__
