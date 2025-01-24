@@ -56,45 +56,46 @@ class CMData:
         """
         if not use_cache:
             return self._fetch_reference_rate(
-                assets, start, end, end_inclusive, frequency,
-                page_size, parallelize, time_inc_parallel, **kwargs
+                assets, start, end, end_inclusive, frequency, page_size, parallelize, time_inc_parallel, **kwargs
             )
 
         end_time = pd.to_datetime(end)
 
-        if self._cache.empty or 'asset' not in self._cache.columns:
+        if self._cache.empty or "asset" not in self._cache.columns:
             self._cache = self._fetch_reference_rate(
-                assets, start, end, end_inclusive, frequency,
-                page_size, parallelize, time_inc_parallel, **kwargs
+                assets, start, end, end_inclusive, frequency, page_size, parallelize, time_inc_parallel, **kwargs
             )
             self._last_update = end_time
             return self._cache
 
-
-        latest_cached = self._cache['time'].max()
+        latest_cached = self._cache["time"].max()
         if end_time > latest_cached:
             new_data = self._fetch_reference_rate(
-                assets, latest_cached, end, end_inclusive, frequency,
-                page_size, parallelize, time_inc_parallel, **kwargs
+                assets,
+                latest_cached,
+                end,
+                end_inclusive,
+                frequency,
+                page_size,
+                parallelize,
+                time_inc_parallel,
+                **kwargs,
             )
 
-            self._cache = pd.concat([self._cache, new_data]).drop_duplicates(subset=['time'])
-            self._cache.sort_values('time', inplace=True)
+            self._cache = pd.concat([self._cache, new_data]).drop_duplicates(subset=["time"])
+            self._cache.sort_values("time", inplace=True)
             self._last_update = end_time
 
         # Remove data older than 24 hours from latest point
         cutoff_time = end_time - pd.Timedelta(days=1)
-        self._cache = self._cache[self._cache['time'] >= cutoff_time]
+        self._cache = self._cache[self._cache["time"] >= cutoff_time]
 
         # Filter data for requested time range
         if start:
             start_time = pd.to_datetime(start)
-            return self._cache[
-                (self._cache['time'] >= start_time) &
-                (self._cache['time'] <= end_time)
-            ]
+            return self._cache[(self._cache["time"] >= start_time) & (self._cache["time"] <= end_time)]
 
-        return self._cache[self._cache['time'] <= end_time]
+        return self._cache[self._cache["time"] <= end_time]
 
     def get_pair_candles(
         self,
