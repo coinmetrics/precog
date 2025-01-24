@@ -9,6 +9,8 @@ class CMData:
     def __init__(self, api_key: str = "") -> None:
         self._api_key = api_key
         self._client = CoinMetricsClient(self.api_key)
+        self._cache = pd.DataFrame()
+        self._last_update = None
 
     @property
     def api_key(self):
@@ -28,6 +30,7 @@ class CMData:
         page_size: int = 10000,
         parallelize: bool = False,
         time_inc_parallel: pd.Timedelta = pd.Timedelta("1h"),
+        use_cache: bool = True,
         **kwargs,
     ) -> pd.DataFrame:
         """Fetches CM Reference Rate for specific asset ticker or list of tickers from CoinMetrics Python client.
@@ -42,6 +45,7 @@ class CMData:
             parallelize (bool, optional): Whether to parallelize query into multiple queries.
                 Can speed up retrieval but may go over usage limits. Defaults to False.
             time_inc_parallel (pd.Timedelta, optional): If using parallelize, time interval queried by each thread. Defaults to pd.Timedelta("1h").
+            use_cache (bool, optional): Whether to use cached data. Defaults to True.
 
         Returns:
             pd.DataFrame: Reference Rate of assets over time, with columns
@@ -50,25 +54,47 @@ class CMData:
         Notes:
             CM API Reference: https://coinmetrics.github.io/api-client-python/site/api_client.html#get_pair_candles
         """
+        if not use_cache:
+            return self._fetch_reference_rate(
+                assets, start, end, end_inclusive, frequency,
+                page_size, parallelize, time_inc_parallel, **kwargs
+            )
 
-        reference_rate = self.client.get_asset_metrics(
-            assets,
-            metrics="ReferenceRateUSD",
-            start_time=start,
-            end_time=end,
-            end_inclusive=end_inclusive,
-            frequency=frequency,
-            page_size=page_size,
-            **kwargs,
-        )
+        end_time = pd.to_datetime(end)
 
-        if parallelize:
-            reference_rate_df = reference_rate.parallel(time_increment=time_inc_parallel).to_dataframe()
-        else:
-            reference_rate_df = reference_rate.to_dataframe()
+        if self._cache.empty or 'asset' not in self._cache.columns:
+            self._cache = self._fetch_reference_rate(
+                assets, start, end, end_inclusive, frequency,
+                page_size, parallelize, time_inc_parallel, **kwargs
+            )
+            self._last_update = end_time
+            return self._cache
 
-        reference_rate_df = reference_rate_df.sort_values("time").reset_index(drop=True)
-        return reference_rate_df
+
+        latest_cached = self._cache['time'].max()
+        if end_time > latest_cached:
+            new_data = self._fetch_reference_rate(
+                assets, latest_cached, end, end_inclusive, frequency,
+                page_size, parallelize, time_inc_parallel, **kwargs
+            )
+
+            self._cache = pd.concat([self._cache, new_data]).drop_duplicates(subset=['time'])
+            self._cache.sort_values('time', inplace=True)
+            self._last_update = end_time
+
+        # Remove data older than 24 hours from latest point
+        cutoff_time = end_time - pd.Timedelta(days=1)
+        self._cache = self._cache[self._cache['time'] >= cutoff_time]
+
+        # Filter data for requested time range
+        if start:
+            start_time = pd.to_datetime(start)
+            return self._cache[
+                (self._cache['time'] >= start_time) &
+                (self._cache['time'] <= end_time)
+            ]
+
+        return self._cache[self._cache['time'] <= end_time]
 
     def get_pair_candles(
         self,
@@ -166,3 +192,39 @@ class CMData:
 
         market_funding_rates = self.client.get_market_funding_rates(markets, page_size=page_size, **kwargs)
         return market_funding_rates.to_dataframe()
+
+    def _fetch_reference_rate(
+        self,
+        assets: Union[list, str],
+        start: Optional[Union[datetime, date, str]] = None,
+        end: Optional[Union[datetime, date, str]] = None,
+        end_inclusive: bool = True,
+        frequency: str = "1s",
+        page_size: int = 10000,
+        parallelize: bool = False,
+        time_inc_parallel: pd.Timedelta = pd.Timedelta("1h"),
+        **kwargs,
+    ) -> pd.DataFrame:
+        """Internal method to fetch reference rate data from CM API"""
+        reference_rate = self.client.get_asset_metrics(
+            assets,
+            metrics="ReferenceRateUSD",
+            start_time=start,
+            end_time=end,
+            end_inclusive=end_inclusive,
+            frequency=frequency,
+            page_size=page_size,
+            **kwargs,
+        )
+
+        if parallelize:
+            reference_rate_df = reference_rate.parallel(time_increment=time_inc_parallel).to_dataframe()
+        else:
+            reference_rate_df = reference_rate.to_dataframe()
+
+        return reference_rate_df.sort_values("time").reset_index(drop=True)
+
+    def clear_cache(self):
+        """Clear the cache if needed"""
+        self._cache = pd.DataFrame()
+        self._last_update = None
