@@ -13,6 +13,7 @@ def get_point_estimate(cm: CMData, timestamp: str) -> float:
     """Make a naive forecast by predicting the most recent price
 
     Args:
+        cm (CMData): The CoinMetrics API client
         timestamp (str): The current timestamp provided by the validator request
 
     Returns:
@@ -39,6 +40,7 @@ def get_prediction_interval(cm: CMData, timestamp: str, point_estimate: float) -
     the sample standard deviation
 
     Args:
+        cm (CMData): The CoinMetrics API client
         timestamp (str): The current timestamp provided by the validator request
         point_estimate (float): The center of the prediction interval
 
