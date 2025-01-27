@@ -2,6 +2,7 @@ from typing import Tuple
 
 import bittensor as bt
 import pandas as pd
+import time
 
 from precog.protocol import Challenge
 from precog.utils.timestamp import get_before, to_datetime, to_str
