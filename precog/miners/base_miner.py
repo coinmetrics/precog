@@ -5,6 +5,7 @@ import pandas as pd
 
 from precog.protocol import Challenge
 from precog.utils.timestamp import get_before, to_datetime, to_str
+from precog.utils.cm_data import CMData
 
 
 def get_point_estimate(cm: CMData, timestamp: str) -> float:
