@@ -24,6 +24,7 @@ class Miner:
         self.config = config
         self.config.neuron.type = "Miner"
         setup_bittensor_objects(self)
+        self.cm = CMData()
         # Attach determiners which functions are called when servicing a request.
         bt.logging.info("Attaching forward function to miner axon.")
         self.axon.attach(
@@ -40,7 +41,6 @@ class Miner:
         self.loop.create_task(self.run())
         self.loop.create_task(loop_handler(self, self.resync_metagraph, sleep_time=self.resync_metagraph_rate))
         self.loop.run_forever()
-        self.cm = CMData()
 
     async def run(self):
         bt.logging.info(
