@@ -4,11 +4,10 @@ import bittensor as bt
 import pandas as pd
 
 from precog.protocol import Challenge
-from precog.utils.cm_data import CMData
 from precog.utils.timestamp import get_before, to_datetime, to_str
 
 
-def get_point_estimate(timestamp: str) -> float:
+def get_point_estimate(cm: CMData, timestamp: str) -> float:
     """Make a naive forecast by predicting the most recent price
 
     Args:
@@ -17,8 +16,6 @@ def get_point_estimate(timestamp: str) -> float:
     Returns:
         (float): The current BTC price tied to the provided timestamp
     """
-    # Create data gathering instance
-    cm = CMData()
 
     # Ensure timestamp is correctly typed and set to UTC
     provided_timestamp = to_datetime(timestamp)
@@ -35,7 +32,7 @@ def get_point_estimate(timestamp: str) -> float:
     return btc_price
 
 
-def get_prediction_interval(timestamp: str, point_estimate: float) -> Tuple[float, float]:
+def get_prediction_interval(cm: CMData, timestamp: str, point_estimate: float) -> Tuple[float, float]:
     """Make a naive multi-step prediction interval by estimating
     the sample standard deviation
 
@@ -51,8 +48,6 @@ def get_prediction_interval(timestamp: str, point_estimate: float) -> Tuple[floa
         Make reasonable assumptions that the 1s BTC price residuals are
         uncorrelated and normally distributed
     """
-    # Create data gathering instance
-    cm = CMData()
 
     # Set the time range to be 24 hours
     # Ensure both timestamps are correctly typed and set to UTC
@@ -86,21 +81,34 @@ def get_prediction_interval(timestamp: str, point_estimate: float) -> Tuple[floa
     return lower_bound, upper_bound
 
 
-def forward(synapse: Challenge) -> Challenge:
+def forward(synapse: Challenge, cm: CMData) -> Challenge:
+    total_start_time = time.perf_counter()
     bt.logging.info(
         f"👈 Received prediction request from: {synapse.dendrite.hotkey} for timestamp: {synapse.timestamp}"
     )
 
+    point_estimate_start = time.perf_counter()
     # Get the naive point estimate
-    point_estimate: float = get_point_estimate(timestamp=synapse.timestamp)
+    point_estimate: float = get_point_estimate(cm=cm, timestamp=synapse.timestamp)
 
+    point_estimate_time = time.perf_counter() - point_estimate_start
+    bt.logging.debug(f"⏱️ Point estimate function took: {point_estimate_time:.3f} seconds")
+
+    interval_start = time.perf_counter()
     # Get the naive prediction interval
     prediction_interval: Tuple[float, float] = get_prediction_interval(
-        timestamp=synapse.timestamp, point_estimate=point_estimate
+        cm=cm, timestamp=synapse.timestamp, point_estimate=point_estimate
     )
+
+    interval_time = time.perf_counter() - interval_start
+    bt.logging.debug(f"⏱️ Prediction interval function took: {interval_time:.3f} seconds")
+
 
     synapse.prediction = point_estimate
     synapse.interval = prediction_interval
+
+    total_time = time.perf_counter() - total_start_time
+    bt.logging.debug(f"⏱️ Total forward call took: {total_time:.3f} seconds")
 
     if synapse.prediction is not None:
         bt.logging.success(f"Predicted price: {synapse.prediction}  |  Predicted Interval: {synapse.interval}")

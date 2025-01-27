@@ -11,6 +11,7 @@ from precog.protocol import Challenge
 from precog.utils.bittensor import print_info, setup_bittensor_objects
 from precog.utils.config import config
 from precog.utils.general import func_with_retry, loop_handler
+from precog.utils.cm_data import CMData
 
 
 class Miner:
@@ -39,6 +40,7 @@ class Miner:
         self.loop.create_task(self.run())
         self.loop.create_task(loop_handler(self, self.resync_metagraph, sleep_time=self.resync_metagraph_rate))
         self.loop.run_forever()
+        self.cm = CMData()
 
     async def run(self):
         bt.logging.info(
@@ -63,7 +65,7 @@ class Miner:
         self.current_block = func_with_retry(self.subtensor.get_current_block)
 
     async def forward(self, synapse: Challenge) -> Challenge:
-        synapse = self.forward_module.forward(synapse)
+        synapse = self.forward_module.forward(synapse, self.cm)
         if synapse.prediction is not None:
             bt.logging.success(f"Predicted price: {synapse.prediction}  |  Predicted Interval: {synapse.interval}")
         else:
