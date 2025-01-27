@@ -1,12 +1,12 @@
+import time
 from typing import Tuple
 
 import bittensor as bt
 import pandas as pd
-import time
 
 from precog.protocol import Challenge
-from precog.utils.timestamp import get_before, to_datetime, to_str
 from precog.utils.cm_data import CMData
+from precog.utils.timestamp import get_before, to_datetime, to_str
 
 
 def get_point_estimate(cm: CMData, timestamp: str) -> float:
@@ -104,7 +104,6 @@ def forward(synapse: Challenge, cm: CMData) -> Challenge:
 
     interval_time = time.perf_counter() - interval_start
     bt.logging.debug(f"⏱️ Prediction interval function took: {interval_time:.3f} seconds")
-
 
     synapse.prediction = point_estimate
     synapse.interval = prediction_interval

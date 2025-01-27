@@ -9,9 +9,9 @@ from pytz import timezone
 
 from precog.protocol import Challenge
 from precog.utils.bittensor import print_info, setup_bittensor_objects
+from precog.utils.cm_data import CMData
 from precog.utils.config import config
 from precog.utils.general import func_with_retry, loop_handler
-from precog.utils.cm_data import CMData
 
 
 class Miner:
