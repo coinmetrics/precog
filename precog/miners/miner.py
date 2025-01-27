@@ -9,6 +9,7 @@ from pytz import timezone
 
 from precog.protocol import Challenge
 from precog.utils.bittensor import print_info, setup_bittensor_objects
+from precog.utils.cm_data import CMData
 from precog.utils.config import config
 from precog.utils.general import func_with_retry, loop_handler
 
@@ -23,6 +24,7 @@ class Miner:
         self.config = config
         self.config.neuron.type = "Miner"
         setup_bittensor_objects(self)
+        self.cm = CMData()
         # Attach determiners which functions are called when servicing a request.
         bt.logging.info("Attaching forward function to miner axon.")
         self.axon.attach(
@@ -63,7 +65,7 @@ class Miner:
         self.current_block = func_with_retry(self.subtensor.get_current_block)
 
     async def forward(self, synapse: Challenge) -> Challenge:
-        synapse = self.forward_module.forward(synapse)
+        synapse = self.forward_module.forward(synapse, self.cm)
         if synapse.prediction is not None:
             bt.logging.success(f"Predicted price: {synapse.prediction}  |  Predicted Interval: {synapse.interval}")
         else:
