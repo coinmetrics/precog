@@ -32,7 +32,6 @@ validator:
 		--axon.port $(VALIDATOR_PORT) \
 		--netuid $(netuid) \
 		--logging.level $(LOGGING_LEVEL) \
-		--wandb.off
 
 miner:
 	pm2 start --name $(MINER_NAME) python3 -- precog/miners/miner.py \
@@ -46,4 +45,3 @@ miner:
 		--timeout $(TIMEOUT) \
 		--vpermit_tao_limit $(VPERMIT_TAO_LIMIT) \
 		--forward_function $(FORWARD_FUNCTION) \
-		--wandb.off
