@@ -146,14 +146,15 @@ class weight_setter:
         # Save updated state
         self.save_state()
 
-    def query_miners(self):
+    async def query_miners(self):
         timestamp = get_str()
         synapse = Challenge(timestamp=timestamp)
-        responses = self.dendrite.query(
+        responses = await self.dendrite.forward(
             # Send the query to selected miner axons in the network.
             axons=[self.metagraph.axons[uid] for uid in self.available_uids],
             synapse=synapse,
             deserialize=False,
+            timeout=self.config.neuron.timeout,
         )
         return responses, timestamp
 
@@ -215,7 +216,7 @@ class weight_setter:
             await asyncio.sleep(600)
         else:
             if is_query_time(self.prediction_interval, self.timestamp) or query_lag >= 60 * self.prediction_interval:
-                responses, self.timestamp = self.query_miners()
+                responses, self.timestamp = await self.query_miners()
                 try:
                     bt.logging.debug(f"Processing responses for UIDs: {self.available_uids}")
                     bt.logging.debug(f"Number of responses: {len(responses)}")
@@ -239,13 +240,6 @@ class weight_setter:
                     bt.logging.error(f"Error type: {type(e)}")
                     bt.logging.error("Full traceback:")
                     bt.logging.error(traceback.format_exc())
-                    bt.logging.error(f"Available UIDs: {self.available_uids}")
-                    bt.logging.error(f"Response count: {len(responses)}")
-                    bt.logging.error(f"MinerHistory keys: {list(self.MinerHistory.keys())}")
-                    bt.logging.error(f"Full MinerHistory: {self.MinerHistory}")
-                    for uid, response in zip(self.available_uids, responses):
-                        bt.logging.error(f"UID {uid} response status: {getattr(response, 'status_code', 'unknown')}")
-                        bt.logging.error(f"UID {uid} response type: {type(response)}")
             else:
                 print_info(self)
 
