@@ -1,5 +1,6 @@
 import asyncio
 import os
+import traceback
 
 import bittensor as bt
 import wandb
@@ -45,11 +46,22 @@ async def log_wandb(responses, rewards, miner_uids, hotkeys):
             },
         }
 
-        bt.logging.debug(f"Attempting to log data to wandb: {wandb_val_log}")
+        bt.logging.debug(f"Preparing to log data to wandb. Current event loop: {asyncio.get_running_loop()}")
+        bt.logging.debug(f"Data to log: {wandb_val_log}")
+
+        def _log_to_wandb():
+            try:
+                bt.logging.debug("Starting wandb.log call")
+                wandb.log(wandb_val_log, commit=True)
+                bt.logging.debug("Completed wandb.log call")
+            except Exception as e:
+                bt.logging.error(f"Error in _log_to_wandb: {str(e)}")
+                bt.logging.error(traceback.format_exc())
 
         # Run wandb.log in executor to prevent blocking
-        await asyncio.get_event_loop().run_in_executor(None, lambda: wandb.log(wandb_val_log, commit=True))
+        await asyncio.get_event_loop().run_in_executor(None, _log_to_wandb)
+        bt.logging.debug("Completed async wandb logging")
 
     except Exception as e:
         bt.logging.error(f"Failed to log to wandb: {str(e)}")
-        bt.logging.error("Full error: ", exc_info=True)
+        bt.logging.error(traceback.format_exc())
