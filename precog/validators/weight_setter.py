@@ -275,3 +275,7 @@ class weight_setter:
             self.moving_average_scores = state["moving_average_scores"]
         except Exception as e:
             bt.logging.error(f"Failed to load state with error: {e}")
+            # Initialize default state
+            self.scores = [0.0] * len(self.metagraph.S)
+            self.moving_average_scores = {uid: 0 for uid in self.metagraph.uids}
+            self.MinerHistory = {uid: MinerHistory(uid, timezone=self.timezone) for uid in range(len(self.metagraph.S))}
