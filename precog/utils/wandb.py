@@ -1,3 +1,4 @@
+import asyncio
 import os
 
 import bittensor as bt
@@ -26,8 +27,12 @@ def setup_wandb(self) -> None:
         bt.logging.error("WANDB_API_KEY not found in environment variables.")
 
 
-def log_wandb(responses, rewards, miner_uids, hotkeys):
+async def log_wandb(responses, rewards, miner_uids, hotkeys):
     try:
+        if wandb.run is None:
+            bt.logging.error("No wandb run active. Did setup_wandb() complete successfully?")
+            return
+
         wandb_val_log = {
             "miners_info": {
                 miner_uid: {
@@ -41,7 +46,10 @@ def log_wandb(responses, rewards, miner_uids, hotkeys):
         }
 
         bt.logging.debug(f"Attempting to log data to wandb: {wandb_val_log}")
-        wandb.log(wandb_val_log)
+
+        # Run wandb.log in executor to prevent blocking
+        await asyncio.get_event_loop().run_in_executor(None, lambda: wandb.log(wandb_val_log, commit=True))
+
     except Exception as e:
         bt.logging.error(f"Failed to log to wandb: {str(e)}")
         bt.logging.error("Full error: ", exc_info=True)
