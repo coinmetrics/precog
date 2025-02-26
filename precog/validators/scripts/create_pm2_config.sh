@@ -26,7 +26,7 @@ apps: [
 
 
 # Append the pm2 config file if we want to use auto updater
-if $AUTO_UPDATE; then
+if [[ $AUTO_UPDATE == 1 ]]; then
     echo "Adding auto updater"
     echo ",
     {
@@ -40,6 +40,9 @@ if $AUTO_UPDATE; then
         'GIT_BRANCH': 'main'
     }
     }" >> app.config.js
+else
+    echo "Not using auto updater"
+fi
 
 # Append the closing bracket to the pm2 config file
 echo "
