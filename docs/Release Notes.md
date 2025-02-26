@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+2.1.0
+-----
+Released on February 24th 2025
+- Improved validator state management
+- Validator request timestamps are now identical
+
 2.0.0
 -----
 Released on February 13th 2025
