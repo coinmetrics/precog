@@ -5,7 +5,7 @@ echo "module.exports = {
 
 apps: [
     {
-    name: $(VALIDATOR_NAME),
+    name: $VALIDATOR_NAME,
     script: 'poetry',
     interpreter: 'python3',
     min_uptime: '5m',
@@ -13,20 +13,20 @@ apps: [
     args: [
         'run',
         'python',
-        $(SCRIPT_LOCATION),
-        '--neuron.name $(VALIDATOR_NAME)',
-        '--wallet.name $(COLDKEY)',
-        '--wallet.hotkey $(VALIDATOR_HOTKEY)',
-        '--subtensor.chain_endpoint $($(NETWORK))',
-        '--axon.port $(VALIDATOR_PORT)',
-        '--netuid $(netuid)',
-        '--logging.level $(LOGGING_LEVEL)'
+        $SCRIPT_LOCATION,
+        '--neuron.name $VALIDATOR_NAME',
+        '--wallet.name $COLDKEY',
+        '--wallet.hotkey $VALIDATOR_HOTKEY',
+        '--subtensor.chain_endpoint $$NETWORK',
+        '--axon.port $VALIDATOR_PORT',
+        '--netuid $netuid',
+        '--logging.level $LOGGING_LEVEL'
         ]
     }" > app.config.js
 
 
 # Append the pm2 config file if we want to use auto updater
-if $(AUTO_UPDATE); then
+if $AUTO_UPDATE; then
     echo "Adding auto updater"
     echo ",
     {
@@ -47,7 +47,7 @@ echo "
 };" >> app.config.js
 
 # Run the Python script with the arguments using pm2
-echo "Running $(SCRIPT_LOCATION) with the following pm2 config:"
+echo "Running $SCRIPT_LOCATION with the following pm2 config:"
 
 # Print configuration to be used
 cat app.config.js

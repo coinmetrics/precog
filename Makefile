@@ -39,9 +39,9 @@ miner:
 validator:
 
 	# Check if script is already running with pm2
-	./precog/validators/scripts/pm2_del.sh
+	bash ./precog/validators/scripts/pm2_del.sh
 
 	# Generate the pm2 config file
-	./precog/validators/scripts/create_pm2_config.sh
+	bash ./precog/validators/scripts/create_pm2_config.sh
 
 	pm2 start app.config.js
