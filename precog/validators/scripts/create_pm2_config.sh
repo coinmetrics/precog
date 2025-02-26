@@ -17,7 +17,7 @@ apps: [
         '--neuron.name $VALIDATOR_NAME',
         '--wallet.name $COLDKEY',
         '--wallet.hotkey $VALIDATOR_HOTKEY',
-        '--subtensor.chain_endpoint $$NETWORK',
+        '--subtensor.chain_endpoint ${!NETWORK}',
         '--axon.port $VALIDATOR_PORT',
         '--netuid $netuid',
         '--logging.level $LOGGING_LEVEL'
