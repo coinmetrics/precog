@@ -31,14 +31,15 @@ if [[ $AUTO_UPDATE == 1 ]]; then
     echo ",
     {
     name: 'auto_updater',
-    script: './scripts/autoupdater.sh',
-    interpreter: '/bin/bash',
+    script: 'poetry',
+    interpreter: 'python3',
     min_uptime: '5m',
     max_restarts: '5',
-    env: {
-        'UPDATE_CHECK_INTERVAL': '300',
-        'GIT_BRANCH': 'main'
-    }
+    args: [
+        'run',
+        'python',
+        './precog/validators/scripts/auto_updater.py'
+        ]
     }" >> app.config.js
 else
     echo "Not using auto updater"
