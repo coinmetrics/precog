@@ -61,32 +61,6 @@ def calc_rewards(
     return rewards
 
 
-# def interval_error(intervals, cm_prices):
-#     if intervals is None:
-#         return np.array([0])
-#     else:
-#         interval_errors = []
-#         for i, interval_to_evaluate in enumerate(intervals[:-1]):
-#             lower_bound_prediction = np.min(interval_to_evaluate)
-#             upper_bound_prediction = np.max(interval_to_evaluate)
-#             effective_min = np.max([lower_bound_prediction, np.min(cm_prices[i + 1 :])])
-#             effective_max = np.min([upper_bound_prediction, np.max(cm_prices[i + 1 :])])
-#             f_w = (effective_max - effective_min) / (upper_bound_prediction - lower_bound_prediction)
-#             # print(f"f_w: {f_w} | t: {effective_max} | b: {effective_min} | _pmax: {upper_bound_prediction} | _pmin: {lower_bound_prediction}")
-#             f_i = sum(
-#                 (cm_prices[i + 1 :] >= lower_bound_prediction) & (cm_prices[i + 1 :] <= upper_bound_prediction)
-#             ) / len(cm_prices[i + 1 :])
-#             interval_errors.append(f_w * f_i)
-#             # print(f"lower: {lower_bound_prediction} | upper: {upper_bound_prediction} | cm_prices: {cm_prices[i:]} | error: {f_w * f_i}")
-#         if len(interval_errors) == 0:
-#             return np.inf
-#         elif len(interval_errors) == 1:
-#             mean_error = interval_errors[0]
-#         else:
-#             mean_error = np.nanmean(np.array(interval_errors)).item()
-#         return mean_error
-
-
 def interval_error(intervals, cm_prices):
     if intervals is None or len(intervals) <= 1:
         return np.inf
