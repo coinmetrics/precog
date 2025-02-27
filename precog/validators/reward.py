@@ -23,7 +23,7 @@ def calc_rewards(
     decayed_weights = decay**weights
     timestamp = responses[0].timestamp
     cm = CMData()
-    start_time: str = to_str(get_before(timestamp=timestamp, hours=1))
+    start_time: str = to_str(get_before(timestamp=timestamp, hours=6))
     end_time: str = to_str(to_datetime(timestamp))  # built-ins handle CM API's formatting
     # Query CM API for sample standard deviation of the 1s residuals
     historical_price_data: DataFrame = cm.get_CM_ReferenceRate(
@@ -33,8 +33,8 @@ def calc_rewards(
     for uid, response in zip(self.available_uids, responses):
         current_miner = self.MinerHistory[uid]
         self.MinerHistory[uid].add_prediction(response.timestamp, response.prediction, response.interval)
-        prediction_dict, interval_dict = current_miner.format_predictions(response.timestamp)
-        mature_time_dict = mature_dictionary(prediction_dict)
+        prediction_dict, interval_dict = current_miner.format_predictions(response.timestamp, hours=6)
+        mature_time_dict = mature_dictionary(prediction_dict, hours=6)
         preds, price, aligned_pred_timestamps = align_timepoints(mature_time_dict, cm_data)
         for i, j, k in zip(preds, price, aligned_pred_timestamps):
             bt.logging.debug(f"Prediction: {i} | Price: {j} | Aligned Prediction: {k}")
@@ -42,8 +42,12 @@ def calc_rewards(
         for i, j, k in zip(inters, interval_prices, aligned_int_timestamps):
             bt.logging.debug(f"Interval: {i} | Interval Price: {j} | Aligned TS: {k}")
         point_errors.append(point_error(preds, price))
-        if any([np.isnan(inters).any(), np.isnan(interval_prices).any()]):
-            interval_errors.append(0)
+        if (
+            any([np.isnan(inters).any(), np.isnan(interval_prices).any()])
+            or len(inters) == 0
+            or len(interval_prices) == 0
+        ):
+            interval_errors.append(np.inf)
         else:
             interval_errors.append(interval_error(inters, interval_prices))
         bt.logging.debug(f"UID: {uid} | point_errors: {point_errors[-1]} | interval_errors: {interval_errors[-1]}")
@@ -71,7 +75,9 @@ def interval_error(intervals, cm_prices):
             ) / len(cm_prices[i + 1 :])
             interval_errors.append(f_w * f_i)
             # print(f"lower: {lower_bound_prediction} | upper: {upper_bound_prediction} | cm_prices: {cm_prices[i:]} | error: {f_w * f_i}")
-        if len(interval_errors) == 1:
+        if len(interval_errors) == 0:
+            return np.inf
+        elif len(interval_errors) == 1:
             mean_error = interval_errors[0]
         else:
             mean_error = np.nanmean(np.array(interval_errors)).item()
