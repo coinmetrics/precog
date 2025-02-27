@@ -40,7 +40,7 @@ def log_wandb(responses, rewards, miner_uids, hotkeys):
             },
         }
 
-        bt.logging.debug(f"Attempting to log data to wandb: {wandb_val_log}")
+        bt.logging.trace(f"Attempting to log data to wandb: {wandb_val_log}")
         wandb.log(wandb_val_log)
     except Exception as e:
         bt.logging.error(f"Failed to log to wandb: {str(e)}")
