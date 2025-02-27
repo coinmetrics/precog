@@ -115,10 +115,12 @@ def interval_error(intervals, cm_prices):
 
         interval_errors.append(f_w * f_i)
 
-    if len(interval_errors) == 0:
+    error_array = np.array(interval_errors)
+
+    if np.all(np.isnan(error_array)):
         return np.inf
 
-    return np.nanmean(np.array(interval_errors)).item()
+    return np.nanmean(error_array).item()
 
 
 def point_error(predictions, cm_prices) -> np.ndarray:
