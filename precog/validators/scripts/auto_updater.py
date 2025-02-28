@@ -48,8 +48,8 @@ if __name__ == "__main__":
     logger.info("Starting auto updater...")
 
     # Get the path to the precog directory
-    with pkg_resources.path(precog) as p:
-        package_path = p
+    with pkg_resources.path(precog, "..") as p:
+        git_repo_path = p
 
     # Loop until we observe github activity
     while True:
@@ -65,7 +65,7 @@ if __name__ == "__main__":
             logger.info("Checking for repository changes...")
 
             # Pull the latest changes from github
-            has_changed = git_pull_change(package_path)
+            has_changed = git_pull_change(git_repo_path)
 
             # If the repo has changed, break the loop
             if has_changed:
@@ -97,4 +97,4 @@ if __name__ == "__main__":
     # We can now restart both pm2 processes, including the auto updater
     # Let the script simply end and the new process will be restarted by pm2
     logger.info("Restarting pm2 processes...")
-    subprocess.run(["pm2", "restart", "app.config.js"], cwd=package_path)
+    subprocess.run(["pm2", "restart", "app.config.js"], cwd=git_repo_path)
