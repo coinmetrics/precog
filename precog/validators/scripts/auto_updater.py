@@ -96,5 +96,7 @@ if __name__ == "__main__":
     # This code is only reached when the repo has changed
     # We can now restart both pm2 processes, including the auto updater
     # Let the script simply end and the new process will be restarted by pm2
+    logger.info("Installing dependencies...")
+    subprocess.run(["poetry", "install"], cwd=git_repo_path)
     logger.info("Restarting pm2 processes...")
     subprocess.run(["pm2", "restart", "app.config.js"], cwd=git_repo_path)
