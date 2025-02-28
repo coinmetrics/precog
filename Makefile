@@ -38,7 +38,7 @@ miner:
 
 validator:
 
-	# Check if script is already running with pm2
+	# Delete pm2 processes if they're already running
 	bash ./precog/validators/scripts/pm2_del.sh
 
 	# Generate the pm2 config file
