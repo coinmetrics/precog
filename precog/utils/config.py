@@ -237,6 +237,8 @@ def add_validator_args(parser):
 
     parser.add_argument("--N_TIMEPOINTS", type=int, default=12)
 
+    parser.add_argument("--evaluation_window", type=int, default=6)
+
     parser.add_argument("--reset_state", action="store_true", dest="reset_state", help="Overwrites the state file")
 
 

@@ -15,6 +15,7 @@ def calc_rewards(
     self,
     responses: List[Challenge],
 ) -> np.ndarray:
+    evaluation_window_hours = self.config.evaluation_window
     # preallocate
     point_errors = []
     interval_errors = []
@@ -23,18 +24,22 @@ def calc_rewards(
     decayed_weights = decay**weights
     timestamp = responses[0].timestamp
     cm = CMData()
-    start_time: str = to_str(get_before(timestamp=timestamp, hours=6))
+    start_time: str = to_str(get_before(timestamp=timestamp, hours=evaluation_window_hours))
     end_time: str = to_str(to_datetime(timestamp))  # built-ins handle CM API's formatting
     # Query CM API for sample standard deviation of the 1s residuals
     historical_price_data: DataFrame = cm.get_CM_ReferenceRate(
         assets="BTC", start=start_time, end=end_time, frequency="1s"
     )
     cm_data = pd_to_dict(historical_price_data)
+
+    # TODO: Do we need to set a minimum amount of intervals for evaluation if we are increasing the evaluation window?
     for uid, response in zip(self.available_uids, responses):
         current_miner = self.MinerHistory[uid]
         self.MinerHistory[uid].add_prediction(response.timestamp, response.prediction, response.interval)
-        prediction_dict, interval_dict = current_miner.format_predictions(response.timestamp, hours=6)
-        mature_time_dict = mature_dictionary(prediction_dict, hours=6)
+        prediction_dict, interval_dict = current_miner.format_predictions(
+            response.timestamp, hours=evaluation_window_hours
+        )
+        mature_time_dict = mature_dictionary(prediction_dict, hours=evaluation_window_hours)
         preds, price, aligned_pred_timestamps = align_timepoints(mature_time_dict, cm_data)
         for i, j, k in zip(preds, price, aligned_pred_timestamps):
             bt.logging.debug(f"Prediction: {i} | Price: {j} | Aligned Prediction: {k}")
