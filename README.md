@@ -134,6 +134,16 @@ VALIDATOR_HOTKEY=your_validator_hotkey
 VALIDATOR_NAME=validator
 VALIDATOR_PORT=8091
 
+# Auto Update Configuration
+# Whether to run the auto update script
+# Options: 1, 0
+AUTO_UPDATE=1
+# The name of the process to monitor for auto updates
+AUTO_UPDATE_PROC_NAME=auto-updater
+
+# The location of the validator entry script
+SCRIPT_LOCATION=./precog/validators/validator.py
+
 # Logging
 # Options: info, debug, trace
 LOGGING_LEVEL=debug
@@ -210,6 +220,7 @@ Custom miner:
 
 
 ### Running a Validator
+This will start the validator and the auto update script. Both run as independent pm2 processes. To opt out of auto updates, set `AUTO_UPDATE=0` in your .env.validator file.
 ```
 make validator ENV_FILE=.env.validator
 ```
