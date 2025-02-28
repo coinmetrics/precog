@@ -30,7 +30,7 @@ if [[ $AUTO_UPDATE == 1 ]]; then
     echo "Adding auto updater"
     echo ",
     {
-    name: 'auto_updater',
+    name: '$AUTO_UPDATE_PROC_NAME',
     script: 'poetry',
     interpreter: 'python3',
     min_uptime: '5m',
