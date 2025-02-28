@@ -42,6 +42,7 @@ def git_pull_change(path) -> bool:
 
 
 if __name__ == "__main__":
+    bt.logging.set_debug()
     bt.logging.debug("Starting auto updater...")
 
     # Get the path to the precog directory
