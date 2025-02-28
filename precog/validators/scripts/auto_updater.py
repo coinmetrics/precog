@@ -78,7 +78,7 @@ if __name__ == "__main__":
 
                 # Calculate the time of the next git pull check
                 next_check = now + timedelta(minutes=TIME_INTERVAL)
-                next_check.replace(second=0)
+                next_check = next_check.replace(second=0)
 
                 # Determine the number of seconds to sleep
                 seconds_to_sleep = elapsed_seconds(get_now(), next_check)
