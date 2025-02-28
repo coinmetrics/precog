@@ -221,6 +221,8 @@ Custom miner:
 
 ### Running a Validator
 This will start the validator and the auto update script. Both run as independent pm2 processes. To opt out of auto updates, set `AUTO_UPDATE=0` in your .env.validator file.
+>The auto update script will run every 5 minutes. This script will pull down the latest repository changes and will restart the validator and auto update script if changes are detected. This is to ensure that the validator is always running the latest version of the code. If you have made custom changes to the validator source code, you may want to disable auto updates to prevent overwriting your changes.
+
 ```
 make validator ENV_FILE=.env.validator
 ```
