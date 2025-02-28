@@ -9,30 +9,26 @@ import git
 import precog
 from precog.utils.timestamp import elapsed_seconds, get_now
 
+# Frequency of the auto updater in minutes
 TIME_INTERVAL = 5
 
 
 def git_pull_change(path) -> bool:
+    # Load the git repository
     repo = git.Repo(path)
     current_hash = repo.head.commit
 
-    # Check if there are local changes
-    must_stash = repo.is_dirty()
-
-    # Stash the changes
-    if must_stash:
-        bt.logging.debug("Local changes detected. Stashing...")
-        repo.git.stash("save")
+    # Kill auto update if there are local changes
+    if repo.is_dirty():
+        bt.logging.debug("Local changes detected.")
+        bt.logging.debug("Only run auto update if there are no local changes.")
+        bt.logging.debug("Killing the auto updater.")
+        raise RuntimeError("Local changes detected. Auto update killed")
 
     # Pull the latest changes from github
     repo.remotes.origin.pull(rebase=True)
     bt.logging.debug("Pull complete.")
     new_hash = repo.head.commit
-
-    # Apply stash if exists
-    if must_stash:
-        bt.logging.debug("Applying stash...")
-        repo.git.stash("pop")
 
     bt.logging.debug(f"Current hash: {current_hash}")
     bt.logging.debug(f"New hash: {new_hash}")
