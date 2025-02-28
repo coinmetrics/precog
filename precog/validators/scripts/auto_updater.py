@@ -34,7 +34,7 @@ def git_pull_change(path) -> bool:
 
     # Apply stash if exists
     if must_stash:
-        print("Applying stash...")
+        logger.info("Applying stash...")
         repo.git.stash("pop")
 
     logger.info(f"Current hash: {current_hash}")
