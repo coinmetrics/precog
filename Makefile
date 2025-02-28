@@ -23,16 +23,6 @@ register:
 		btcli subnet register --netuid $(netuid) --wallet.name "$$wallet_name" --wallet.hotkey "$$hotkey_name" --subtensor.chain_endpoint $($(NETWORK)) ;\
 	}
 
-validator:
-	pm2 start --name $(VALIDATOR_NAME) python3 -- precog/validators/validator.py \
-		--neuron.name $(VALIDATOR_NAME) \
-		--wallet.name $(COLDKEY) \
-		--wallet.hotkey $(VALIDATOR_HOTKEY) \
-		--subtensor.chain_endpoint $($(NETWORK)) \
-		--axon.port $(VALIDATOR_PORT) \
-		--netuid $(netuid) \
-		--logging.level $(LOGGING_LEVEL) \
-
 miner:
 	pm2 start --name $(MINER_NAME) python3 -- precog/miners/miner.py \
 		--neuron.name $(MINER_NAME) \
@@ -45,3 +35,13 @@ miner:
 		--timeout $(TIMEOUT) \
 		--vpermit_tao_limit $(VPERMIT_TAO_LIMIT) \
 		--forward_function $(FORWARD_FUNCTION) \
+
+validator:
+
+	# Delete pm2 processes if they're already running
+	bash ./precog/validators/scripts/pm2_del.sh
+
+	# Generate the pm2 config file
+	bash ./precog/validators/scripts/create_pm2_config.sh
+
+	pm2 start app.config.js
