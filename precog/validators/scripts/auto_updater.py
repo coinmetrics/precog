@@ -21,28 +21,28 @@ def git_pull_change(path) -> bool:
 
     # Stash the changes
     if must_stash:
-        bt.logging.info("Local changes detected. Stashing...")
+        bt.logging.debug("Local changes detected. Stashing...")
         repo.git.stash("save")
 
     # Pull the latest changes from github
     repo.remotes.origin.pull(rebase=True)
-    bt.logging.info("Pull complete.")
+    bt.logging.debug("Pull complete.")
     new_hash = repo.head.commit
 
     # Apply stash if exists
     if must_stash:
-        bt.logging.info("Applying stash...")
+        bt.logging.debug("Applying stash...")
         repo.git.stash("pop")
 
-    bt.logging.info(f"Current hash: {current_hash}")
-    bt.logging.info(f"New hash: {new_hash}")
+    bt.logging.debug(f"Current hash: {current_hash}")
+    bt.logging.debug(f"New hash: {new_hash}")
 
     # Return True if the hash has changed
     return current_hash != new_hash
 
 
 if __name__ == "__main__":
-    bt.logging.info("Starting auto updater...")
+    bt.logging.debug("Starting auto updater...")
 
     # Get the path to the precog directory
     with pkg_resources.path(precog, "..") as p:
@@ -57,19 +57,19 @@ if __name__ == "__main__":
         # Check if the current minute is 2 minutes past anticipated validator query time
         if now.minute % TIME_INTERVAL == 2:
 
-            bt.logging.info("Checking for repository changes...")
+            bt.logging.debug("Checking for repository changes...")
 
             # Pull the latest changes from github
             has_changed = git_pull_change(git_repo_path)
 
             # If the repo has changed, break the loop
             if has_changed:
-                bt.logging.info("Repository has changed!")
+                bt.logging.debug("Repository has changed!")
                 break
 
             # If the repo has not changed, sleep
             else:
-                bt.logging.info("Repository has not changed. Sleep mode activated.")
+                bt.logging.debug("Repository has not changed. Sleep mode activated.")
 
                 # Calculate the time of the next git pull check
                 next_check = now + timedelta(minutes=TIME_INTERVAL)
@@ -85,13 +85,13 @@ if __name__ == "__main__":
             # Sleep for 45 seconds
             # This is to prevent the script from checking for changes too frequently
             # This specific `else` block should not be reach too often since we sleep for the exact time of the anticipated validator query time
-            bt.logging.info("Sleeping for 45 seconds")
+            bt.logging.debug("Sleeping for 45 seconds")
             time.sleep(45)
 
     # This code is only reached when the repo has changed
     # We can now restart both pm2 processes, including the auto updater
     # Let the script simply end and the new process will be restarted by pm2
-    bt.logging.info("Installing dependencies...")
+    bt.logging.debug("Installing dependencies...")
     subprocess.run(["poetry", "install"], cwd=git_repo_path)
-    bt.logging.info("Restarting pm2 processes...")
+    bt.logging.debug("Restarting pm2 processes...")
     subprocess.run(["pm2", "restart", "app.config.js"], cwd=git_repo_path)
