@@ -13,7 +13,7 @@ from precog.utils.timestamp import elapsed_seconds, get_now
 TIME_INTERVAL = 5
 
 
-def git_pull_change(path) -> bool:
+def git_pull_change(path, max_retries=3, retry_delay=5) -> bool:
     # Load the git repository
     repo = git.Repo(path)
     current_hash = repo.head.commit
@@ -25,9 +25,22 @@ def git_pull_change(path) -> bool:
         bt.logging.debug("Killing the auto updater.")
         raise RuntimeError("Local changes detected. Auto update killed")
 
-    # Pull the latest changes from github
-    repo.remotes.origin.pull(rebase=True)
-    bt.logging.debug("Pull complete.")
+    # Try pulling with retries
+    for attempt in range(max_retries):
+        try:
+            # Pull the latest changes from github
+            repo.remotes.origin.pull(rebase=True)
+            bt.logging.debug("Pull complete.")
+            break
+        except Exception as e:
+            if attempt < max_retries - 1:  # Don't sleep on the last attempt
+                bt.logging.debug(f"Pull attempt {attempt + 1} failed: {str(e)}")
+                bt.logging.debug(f"Retrying in {retry_delay} seconds...")
+                time.sleep(retry_delay)
+            else:
+                bt.logging.debug(f"All pull attempts failed. Last error: {str(e)}")
+                raise  # Re-raise the last exception if all retries failed
+
     new_hash = repo.head.commit
 
     bt.logging.debug(f"Current hash: {current_hash}")
