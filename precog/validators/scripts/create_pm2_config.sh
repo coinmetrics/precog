@@ -5,7 +5,7 @@ echo "module.exports = {
 
 apps: [
     {
-    name: $VALIDATOR_NAME,
+    name: '$VALIDATOR_NAME',
     script: 'poetry',
     interpreter: 'python3',
     min_uptime: '5m',
@@ -13,14 +13,14 @@ apps: [
     args: [
         'run',
         'python',
-        $SCRIPT_LOCATION,
-        '--neuron.name $VALIDATOR_NAME',
-        '--wallet.name $COLDKEY',
-        '--wallet.hotkey $VALIDATOR_HOTKEY',
-        '--subtensor.chain_endpoint ${!NETWORK}',
-        '--axon.port $VALIDATOR_PORT',
-        '--netuid $netuid',
-        '--logging.level $LOGGING_LEVEL'
+        '$SCRIPT_LOCATION',
+        '--neuron.name', '$VALIDATOR_NAME',
+        '--wallet.name', '$COLDKEY',
+        '--wallet.hotkey', '$VALIDATOR_HOTKEY',
+        '--subtensor.chain_endpoint', '${!NETWORK}',
+        '--axon.port', '$VALIDATOR_PORT',
+        '--netuid', '$netuid',
+        '--logging.level', '$LOGGING_LEVEL'
         ]
     }" > app.config.js
 

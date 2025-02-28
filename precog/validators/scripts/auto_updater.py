@@ -19,16 +19,29 @@ def git_pull_change(path) -> bool:
     repo = git.Repo(path)
     current_hash = repo.head.commit
 
+    # Check if there are local changes
+    must_stash = repo.is_dirty()
+
+    # Stash the changes
+    if must_stash:
+        logger.info("Local changes detected. Stashing...")
+        repo.git.stash("save")
+
+    # Pull the latest changes from github
     repo.remotes.origin.pull(rebase=True)
+    logger.info("Pull complete.")
     new_hash = repo.head.commit
+
+    # Apply stash if exists
+    if must_stash:
+        print("Applying stash...")
+        repo.git.stash("pop")
 
     logger.info(f"Current hash: {current_hash}")
     logger.info(f"New hash: {new_hash}")
 
-    if current_hash == new_hash:
-        return False
-    else:
-        return True
+    # Return True if the hash has changed
+    return current_hash != new_hash
 
 
 if __name__ == "__main__":
@@ -47,6 +60,8 @@ if __name__ == "__main__":
         # Check if the current minute is 2 minutes past anticipated validator query time
         if now.minute % TIME_INTERVAL == 2:
 
+            logger.info(f"Current time: {now}")
+
             logger.info("Checking for repository changes...")
 
             # Pull the latest changes from github
@@ -63,7 +78,7 @@ if __name__ == "__main__":
 
                 # Calculate the time of the next git pull check
                 next_check = now + timedelta(minutes=TIME_INTERVAL)
-                next_check.second = 0
+                next_check.replace(second=0)
 
                 # Determine the number of seconds to sleep
                 seconds_to_sleep = elapsed_seconds(get_now(), next_check)
@@ -75,6 +90,7 @@ if __name__ == "__main__":
             # Sleep for 45 seconds
             # This is to prevent the script from checking for changes too frequently
             # This specific `else` block should not be reach too often since we sleep for the exact time of the anticipated validator query time
+            logger.info("Sleeping for 45 seconds")
             time.sleep(45)
 
     # This code is only reached when the repo has changed
