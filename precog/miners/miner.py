@@ -41,7 +41,7 @@ class Miner:
         self.loop.create_task(self.run())
         self.loop.create_task(loop_handler(self, self.resync_metagraph, sleep_time=self.resync_metagraph_rate))
         self.loop.create_task(loop_handler(self, self.monitor_cm_cache, sleep_time=300))
-        self.loop.create_task(loop_handler(self, self.clear_cm_cache, sleep_time=3600))
+        # self.loop.create_task(loop_handler(self, self.clear_cm_cache, sleep_time=3600))
         self.loop.run_forever()
 
     async def run(self):
