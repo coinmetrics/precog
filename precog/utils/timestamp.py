@@ -185,8 +185,8 @@ def round_to_interval(timestamp: datetime, interval_minutes: int = 5) -> datetim
     rounded_minutes = round(minutes_since_midnight / interval_minutes) * interval_minutes
 
     # Create new timestamp with rounded minutes
-    new_timestamp = utc_timestamp.replace(
-        hour=int(rounded_minutes // 60), minute=int(rounded_minutes % 60), second=0, microsecond=0
+    new_timestamp = utc_timestamp.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(
+        minutes=rounded_minutes
     )
 
     return new_timestamp
