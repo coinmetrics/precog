@@ -76,6 +76,8 @@ class CMData:
         Notes:
             CM API Reference: https://coinmetrics.github.io/api-client-python/site/api_client.html#get_pair_candles
         """
+        bt.logging.info(f"Requesting data from {start} to {end}")
+
         if not use_cache:
             return self._fetch_reference_rate(
                 assets, start, end, end_inclusive, frequency, page_size, parallelize, time_inc_parallel, **kwargs
