@@ -1,6 +1,11 @@
 Release Notes
 =============
 
+2.2.0
+-----
+Released on March 4th 2025
+- Implemented validator auto updater to pull latest changes from GitHub
+
 2.1.0
 -----
 Released on February 24th 2025
