@@ -40,6 +40,8 @@ class Miner:
         self.stop_event = asyncio.Event()
         self.loop.create_task(self.run())
         self.loop.create_task(loop_handler(self, self.resync_metagraph, sleep_time=self.resync_metagraph_rate))
+        self.loop.create_task(loop_handler(self, self.monitor_cm_cache, sleep_time=300))
+        self.loop.create_task(loop_handler(self, self.clear_cm_cache, sleep_time=3600))
         self.loop.run_forever()
 
     async def run(self):
@@ -57,8 +59,29 @@ class Miner:
                 self.axon.stop()
                 break
 
+    async def monitor_cm_cache(self):
+        """Periodically logs cache statistics."""
+        bt.logging.info("Running scheduled cache monitoring...")
+        if hasattr(self.cm, "log_cache_stats"):
+            self.cm.log_cache_stats()
+        else:
+            # Fallback if using original CMData without monitoring
+            cache_size = len(self.cm._cache) if hasattr(self.cm, "_cache") and not self.cm._cache.empty else 0
+            bt.logging.info(f"CMData cache size: {cache_size} rows")
+
+    async def clear_cm_cache(self):
+        """Periodically clears the CM cache to prevent memory growth."""
+        if hasattr(self.cm, "clear_cache"):
+            bt.logging.info("Running scheduled cache clearing...")
+            self.cm.clear_cache()
+            # Explicitly trigger garbage collection
+            import gc
+
+            gc.collect()
+            bt.logging.info("Cache cleared and garbage collection triggered")
+
     async def resync_metagraph(self):
-        self.subtensor = bt.subtensor(config=self.config, network=self.config.subtensor.chain_endpoint)
+        # self.subtensor = bt.subtensor(config=self.config, network=self.config.subtensor.chain_endpoint)
         bt.logging.info("Syncing Metagraph...")
         self.metagraph.sync(subtensor=self.subtensor)
         bt.logging.info("Metagraph updated, re-syncing hotkeys, dendrite pool and moving averages")
