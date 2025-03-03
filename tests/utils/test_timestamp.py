@@ -249,3 +249,44 @@ class TestTimestamp(unittest.TestCase):
         self.assertEqual(new_datetime, new_datetime2)
         self.assertEqual(new_datetime2.tzinfo, get_timezone())
         self.assertEqual(new_float, new_float2)
+
+    def test_round_to_interval(self):
+        """Test rounding a timestamp to a given interval."""
+        from precog.utils.timestamp import round_to_interval
+
+        # Basic rounding tests
+        dt = datetime(2024, 1, 1, 14, 13, 30, tzinfo=get_timezone())
+
+        # Round to 5-minute interval (should round up to 14:15)
+        rounded = round_to_interval(dt, 5)
+        self.assertEqual(rounded, datetime(2024, 1, 1, 14, 15, 0, 0, tzinfo=get_timezone()))
+
+        # Round to 15-minute interval (should round up to 14:15)
+        rounded = round_to_interval(dt, 15)
+        self.assertEqual(rounded, datetime(2024, 1, 1, 14, 15, 0, 0, tzinfo=get_timezone()))
+
+        # Test rounding down case
+        dt = datetime(2024, 1, 1, 14, 16, 30, tzinfo=get_timezone())
+        rounded = round_to_interval(dt, 15)
+        self.assertEqual(rounded, datetime(2024, 1, 1, 14, 15, 0, 0, tzinfo=get_timezone()))
+
+        # Test exact interval
+        dt = datetime(2024, 1, 1, 14, 15, 0, tzinfo=get_timezone())
+        rounded = round_to_interval(dt, 15)
+        self.assertEqual(rounded, dt.replace(second=0, microsecond=0))
+
+        # Test non-datetime input
+        time_str = "2024-01-01T14:13:30.000000Z"
+        rounded = round_to_interval(time_str, 5)
+        expected = datetime(2024, 1, 1, 14, 15, 0, tzinfo=get_timezone())
+        self.assertEqual(rounded, expected)
+
+    def test_round_to_interval_midnight(self):
+        """Test special cases of rounding to midnight."""
+        from precog.utils.timestamp import round_to_interval
+
+        # Test case where hour would round up to 24 (should become 00:00 next day)
+        dt = datetime(2024, 1, 1, 23, 58, 0, tzinfo=get_timezone())
+        rounded = round_to_interval(dt, 5)
+        expected = datetime(2024, 1, 2, 0, 0, 0, tzinfo=get_timezone())
+        self.assertEqual(rounded, expected)
