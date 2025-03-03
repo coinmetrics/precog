@@ -25,7 +25,13 @@ def get_point_estimate(cm: CMData, timestamp: str) -> float:
 
     # Query CM API for a pandas dataframe with only one record
     price_data: pd.DataFrame = cm.get_CM_ReferenceRate(
-        assets="BTC", start=None, end=to_str(provided_timestamp), frequency="1s", limit_per_asset=1, paging_from="end"
+        assets="BTC",
+        start=None,
+        end=to_str(provided_timestamp),
+        frequency="1s",
+        limit_per_asset=1,
+        paging_from="end",
+        use_cache=False,
     )
 
     # Get current price closest to the provided timestamp
