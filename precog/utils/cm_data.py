@@ -1,6 +1,7 @@
 from datetime import date, datetime
 from typing import Optional, Union
 
+import bittensor as bt
 import pandas as pd
 from coinmetrics.api_client import CoinMetricsClient
 
@@ -19,6 +20,27 @@ class CMData:
     @property
     def client(self):
         return self._client
+
+    def get_cache_size_mb(self):
+        """Return the approximate size of the cache in MB."""
+        if self._cache.empty:
+            return 0
+        # Calculate memory usage with deep=True to account for actual object sizes
+        return self._cache.memory_usage(deep=True).sum() / (1024 * 1024)
+
+    def log_cache_stats(self):
+        """Log cache statistics."""
+        if self._cache.empty:
+            bt.logging.info("CMData cache is empty")
+            return
+
+        size_mb = self.get_cache_size_mb()
+        rows = len(self._cache)
+        time_range = ""
+        if "time" in self._cache.columns:
+            time_range = f" (time range: {self._cache['time'].min()} to {self._cache['time'].max()})"
+
+        bt.logging.info(f"CMData cache stats: Size={size_mb:.2f}MB, Rows={rows}{time_range}")
 
     def get_CM_ReferenceRate(
         self,
