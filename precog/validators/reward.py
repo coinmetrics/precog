@@ -24,6 +24,7 @@ def calc_rewards(
     weights = np.linspace(0, len(self.available_uids) - 1, len(self.available_uids))
     decayed_weights = decay**weights
     timestamp = responses[0].timestamp
+    bt.logging.debug(f"Calculating rewards for timestamp: {timestamp}")
     cm = CMData()
     start_time: str = to_str(get_before(timestamp=timestamp, hours=evaluation_window_hours))
     end_time: str = to_str(to_datetime(timestamp))  # built-ins handle CM API's formatting
