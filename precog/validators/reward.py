@@ -130,6 +130,24 @@ def interval_error(intervals, cm_prices):
 def point_error(predictions, cm_prices) -> np.ndarray:
     if predictions is None or len(predictions) == 0 or len(cm_prices) == 0:
         return np.inf
-    else:
-        point_error = np.mean(np.abs(np.array(predictions) - np.array(cm_prices)) / np.array(cm_prices))
+
+    # Convert to numpy arrays
+    pred_array = np.array(predictions)
+    price_array = np.array(cm_prices)
+
+    # Calculate absolute percentage errors, handling division by zero
+    with np.errstate(divide="ignore", invalid="ignore"):
+        abs_pct_errors = np.abs(pred_array - price_array) / price_array
+
+    # Check if all values are NaN
+    if np.all(np.isnan(abs_pct_errors)):
+        return np.inf
+
+    # Calculate mean ignoring NaN values
+    point_error = np.nanmean(abs_pct_errors)
+
+    # Handle if result is still NaN
+    if np.isnan(point_error):
+        return np.inf
+
     return point_error.item()
