@@ -75,15 +75,13 @@ def calc_rewards(
             bt.logging.debug(f"Interval: {i} | Interval Price: {j} | Aligned TS: {k}")
         point_errors.append(point_error(preds, price))
         try:
-            if (
-                any([np.isnan(inters).any(), np.isnan(interval_prices).any()])
-                or len(inters) == 0
-                or len(interval_prices) == 0
-            ):
+            if len(inters) == 0 or len(interval_prices) == 0:
                 interval_errors.append(np.inf)
             else:
+                # Let interval_error handle NaN values
                 interval_errors.append(interval_error(inters, interval_prices))
-        except Exception:
+        except Exception as e:
+            bt.logging.debug(f"Exception in interval error calculation: {e}")
             interval_errors.append(np.inf)
         bt.logging.debug(f"UID: {uid} | point_errors: {point_errors[-1]} | interval_errors: {interval_errors[-1]}")
 
