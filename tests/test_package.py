@@ -16,4 +16,4 @@ class TestPackage(unittest.TestCase):
     def test_package_version(self):
         # Check that version is as expected
         # Must update to increment package version successfully
-        self.assertEqual(__version__, "2.2.1")
+        self.assertEqual(__version__, "2.2.2")

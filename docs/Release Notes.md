@@ -1,6 +1,13 @@
 Release Notes
 =============
 
+2.2.2
+-----
+Released on March 5th 2025
+- Periodically clear the MinerHistory object
+- Minimize subtensor instantiation by reusing the same subtensor initialized on miner/validator startup
+- Only use the cm_data cache for the prediction interval data (24 hours in the base miner)
+
 2.2.1
 -----
 Released on March 5th 2025
