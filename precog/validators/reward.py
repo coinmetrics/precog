@@ -38,11 +38,6 @@ def calc_rewards(
     )
     cm_data = pd_to_dict(historical_price_data)
 
-    bt.logging.debug(f"CM data length: {len(cm_data)}")
-    if len(cm_data) > 0:
-        bt.logging.debug(f"CM data first timestamp: {list(cm_data.keys())[0]}")
-        bt.logging.debug(f"CM data last timestamp: {list(cm_data.keys())[-1]}")
-
     for uid, response in zip(self.available_uids, responses):
         current_miner = self.MinerHistory[uid]
         self.MinerHistory[uid].add_prediction(response.timestamp, response.prediction, response.interval)
@@ -55,19 +50,7 @@ def calc_rewards(
         # Mature the predictions (shift forward by 1 hour)
         mature_time_dict = mature_dictionary(prediction_dict, hours=prediction_future_hours)
 
-        bt.logging.debug(
-            f"UID: {uid} | LENGTHS: prediction_dict={len(prediction_dict)}, mature_time_dict={len(mature_time_dict)}"
-        )
-        bt.logging.debug(
-            f"UID: {uid} | LENGTHS: prediction_dict={len(prediction_dict)}, interval_dict={len(interval_dict)}, mature_time_dict={len(mature_time_dict)}"
-        )
-        if len(mature_time_dict) > 0:
-            bt.logging.debug(f"UID: {uid} | Mature dict first timestamp: {list(mature_time_dict.keys())[0]}")
-            bt.logging.debug(f"UID: {uid} | Mature dict last timestamp: {list(mature_time_dict.keys())[-1]}")
         preds, price, aligned_pred_timestamps = align_timepoints(mature_time_dict, cm_data)
-        bt.logging.debug(
-            f"UID: {uid} | AFTER ALIGNMENT: preds={len(preds)}, price={len(price)}, aligned_timestamps={len(aligned_pred_timestamps)}"
-        )
         # for i, j, k in zip(preds, price, aligned_pred_timestamps):
         #     bt.logging.debug(f"Prediction: {i} | Price: {j} | Aligned Prediction: {k}")
         inters, interval_prices, aligned_int_timestamps = align_timepoints(interval_dict, cm_data)
@@ -84,12 +67,6 @@ def calc_rewards(
     interval_ranks = rank(-np.array(interval_errors))  # 1 is best, 0 is worst, so flip it
     rewards = (decayed_weights[point_ranks] + decayed_weights[interval_ranks]) / 2
 
-    bt.logging.debug(f"Point errors: {point_errors}")
-    bt.logging.debug(f"Point ranks: {point_ranks}")
-    bt.logging.debug(f"Interval errors: {interval_errors}")
-    bt.logging.debug(f"Interval ranks: {interval_ranks}")
-    bt.logging.debug(f"Decayed weights: {decayed_weights}")
-    bt.logging.debug(f"Final rewards: {rewards}")
     return rewards
 
 
