@@ -82,7 +82,14 @@ class Miner:
 
     async def resync_metagraph(self):
         bt.logging.info("Syncing Metagraph...")
-        self.metagraph.sync(subtensor=self.subtensor)
+        try:
+            self.metagraph.sync(subtensor=self.subtensor)
+        except Exception as e:
+            bt.logging.debug(f"Failed to sync metagraph: {e}")
+            bt.logging.debug("Instantiating new subtensor")
+            self.subtensor = bt.subtensor(config=self.config, network=self.config.subtensor.chain_endpoint)
+            self.metagraph.sync(subtensor=self.subtensor)
+
         bt.logging.info("Metagraph updated, re-syncing hotkeys, dendrite pool and moving averages")
         self.current_block = func_with_retry(self.subtensor.get_current_block)
 

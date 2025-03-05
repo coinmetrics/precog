@@ -109,12 +109,18 @@ class weight_setter:
         except Exception as e:
             bt.logging.error(f"Error clearing old predictions: {e}")
 
-    async def resync_metagraph(self):
+    async def resync_metagraph(self):  # noqa: C901
         """Resyncs the metagraph and updates the hotkeys, available UIDs, and MinerHistory.
         Ensures all data structures remain in sync."""
-        # Resync subtensor and metagraph
         bt.logging.info("Syncing Metagraph...")
-        self.metagraph.sync(subtensor=self.subtensor)
+        try:
+            self.metagraph.sync(subtensor=self.subtensor)
+        except Exception as e:
+            bt.logging.debug(f"Failed to sync metagraph: {e}")
+            bt.logging.debug("Instantiating new subtensor")
+            self.subtensor = bt.subtensor(config=self.config, network=self.config.subtensor.chain_endpoint)
+            self.metagraph.sync(subtensor=self.subtensor)
+
         bt.logging.info("Metagraph updated, re-syncing hotkeys, dendrite pool and moving averages")
 
         # Get current state for logging
