@@ -7,7 +7,7 @@ from pandas import DataFrame
 from precog.protocol import Challenge
 from precog.utils.cm_data import CMData
 from precog.utils.general import pd_to_dict, rank
-from precog.utils.timestamp import align_timepoints, get_before, mature_dictionary, to_str
+from precog.utils.timestamp import align_timepoints, get_before, mature_dictionary, to_datetime, to_str
 
 
 ################################################################################
@@ -31,7 +31,7 @@ def calc_rewards(
     # Start: (evaluation_window + prediction) hours ago
     # End: 1 hour ago (to ensure all predictions have matured)
     start_time: str = to_str(get_before(timestamp=timestamp, hours=evaluation_window_hours + prediction_future_hours))
-    end_time: str = to_str(get_before(timestamp=timestamp, hours=prediction_future_hours))
+    end_time: str = to_str(to_datetime(get_before(timestamp=timestamp, hours=prediction_future_hours)))
     # Query CM API for sample standard deviation of the 1s residuals
     historical_price_data: DataFrame = cm.get_CM_ReferenceRate(
         assets="BTC", start=start_time, end=end_time, frequency="1s"
@@ -74,26 +74,14 @@ def calc_rewards(
         for i, j, k in zip(inters, interval_prices, aligned_int_timestamps):
             bt.logging.debug(f"Interval: {i} | Interval Price: {j} | Aligned TS: {k}")
         point_errors.append(point_error(preds, price))
-        try:
-            if len(inters) == 0 or len(interval_prices) == 0:
-                interval_errors.append(np.inf)
-            else:
-                # Let interval_error handle NaN values
-                interval_errors.append(interval_error(inters, interval_prices))
-        except Exception as e:
-            bt.logging.debug(f"Exception in interval error calculation: {e}")
-            interval_errors.append(np.inf)
+        if any([np.isnan(inters).any(), np.isnan(interval_prices).any()]):
+            interval_errors.append(0)
+        else:
+            interval_errors.append(interval_error(inters, interval_prices))
         bt.logging.debug(f"UID: {uid} | point_errors: {point_errors[-1]} | interval_errors: {interval_errors[-1]}")
 
-    point_errors_array = np.array(point_errors)
-    interval_errors_array = np.array(interval_errors)
-
-    # Replace any remaining NaN values with appropriate defaults
-    point_errors_array = np.nan_to_num(point_errors_array, nan=999.0)
-    interval_errors_array = np.nan_to_num(interval_errors_array, nan=0.0)
-
-    point_ranks = rank(np.array(point_errors_array))
-    interval_ranks = rank(-np.array(interval_errors_array))  # 1 is best, 0 is worst, so flip it
+    point_ranks = rank(np.array(point_errors))
+    interval_ranks = rank(-np.array(interval_errors))  # 1 is best, 0 is worst, so flip it
     rewards = (decayed_weights[point_ranks] + decayed_weights[interval_ranks]) / 2
 
     bt.logging.debug(f"Point errors: {point_errors}")
@@ -106,62 +94,32 @@ def calc_rewards(
 
 
 def interval_error(intervals, cm_prices):
-    if intervals is None or len(intervals) <= 1:
-        return 0.0
-
-    interval_errors = []
-    for i, interval_to_evaluate in enumerate(intervals[:-1]):
-        if i + 1 >= len(cm_prices):
-            continue
-
-        lower_bound_prediction = np.min(interval_to_evaluate)
-        upper_bound_prediction = np.max(interval_to_evaluate)
-
-        if upper_bound_prediction <= lower_bound_prediction:
-            continue
-
-        effective_min = np.max([lower_bound_prediction, np.min(cm_prices[i + 1 :])])
-        effective_max = np.min([upper_bound_prediction, np.max(cm_prices[i + 1 :])])
-
-        if effective_max <= effective_min:
-            continue
-
-        f_w = (effective_max - effective_min) / (upper_bound_prediction - lower_bound_prediction)
-        f_i = sum(
-            (cm_prices[i + 1 :] >= lower_bound_prediction) & (cm_prices[i + 1 :] <= upper_bound_prediction)
-        ) / len(cm_prices[i + 1 :])
-
-        interval_errors.append(f_w * f_i)
-
-    error_array = np.array(interval_errors)
-
-    if len(error_array) == 0 or np.all(np.isnan(error_array)):
-        return 0.0
-
-    return np.nanmean(error_array).item()
+    if intervals is None:
+        return np.array([0])
+    else:
+        interval_errors = []
+        for i, interval_to_evaluate in enumerate(intervals[:-1]):
+            lower_bound_prediction = np.min(interval_to_evaluate)
+            upper_bound_prediction = np.max(interval_to_evaluate)
+            effective_min = np.max([lower_bound_prediction, np.min(cm_prices[i + 1 :])])
+            effective_max = np.min([upper_bound_prediction, np.max(cm_prices[i + 1 :])])
+            f_w = (effective_max - effective_min) / (upper_bound_prediction - lower_bound_prediction)
+            # print(f"f_w: {f_w} | t: {effective_max} | b: {effective_min} | _pmax: {upper_bound_prediction} | _pmin: {lower_bound_prediction}")
+            f_i = sum(
+                (cm_prices[i + 1 :] >= lower_bound_prediction) & (cm_prices[i + 1 :] <= upper_bound_prediction)
+            ) / len(cm_prices[i + 1 :])
+            interval_errors.append(f_w * f_i)
+            # print(f"lower: {lower_bound_prediction} | upper: {upper_bound_prediction} | cm_prices: {cm_prices[i:]} | error: {f_w * f_i}")
+        if len(interval_errors) == 1:
+            mean_error = interval_errors[0]
+        else:
+            mean_error = np.nanmean(np.array(interval_errors)).item()
+        return mean_error
 
 
 def point_error(predictions, cm_prices) -> np.ndarray:
-    if predictions is None or len(predictions) == 0 or len(cm_prices) == 0:
-        return np.inf
-
-    # Convert to numpy arrays
-    pred_array = np.array(predictions)
-    price_array = np.array(cm_prices)
-
-    # Calculate absolute percentage errors, handling division by zero
-    with np.errstate(divide="ignore", invalid="ignore"):
-        abs_pct_errors = np.abs(pred_array - price_array) / price_array
-
-    # Check if all values are NaN
-    if np.all(np.isnan(abs_pct_errors)):
-        return np.inf
-
-    # Calculate mean ignoring NaN values
-    point_error = np.nanmean(abs_pct_errors)
-
-    # Handle if result is still NaN
-    if np.isnan(point_error):
-        return np.inf
-
+    if predictions is None:
+        point_error = np.inf
+    else:
+        point_error = np.mean(np.abs(np.array(predictions) - np.array(cm_prices)) / np.array(cm_prices))
     return point_error.item()
