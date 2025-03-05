@@ -85,8 +85,15 @@ def calc_rewards(
             interval_errors.append(np.inf)
         bt.logging.debug(f"UID: {uid} | point_errors: {point_errors[-1]} | interval_errors: {interval_errors[-1]}")
 
-    point_ranks = rank(np.array(point_errors))
-    interval_ranks = rank(-np.array(interval_errors))  # 1 is best, 0 is worst, so flip it
+    point_errors_array = np.array(point_errors)
+    interval_errors_array = np.array(interval_errors)
+
+    # Replace any remaining NaN values with appropriate defaults
+    point_errors_array = np.nan_to_num(point_errors_array, nan=999.0)
+    interval_errors_array = np.nan_to_num(interval_errors_array, nan=0.0)
+
+    point_ranks = rank(np.array(point_errors_array))
+    interval_ranks = rank(-np.array(interval_errors_array))  # 1 is best, 0 is worst, so flip it
     rewards = (decayed_weights[point_ranks] + decayed_weights[interval_ranks]) / 2
 
     bt.logging.debug(f"Point errors: {point_errors}")
