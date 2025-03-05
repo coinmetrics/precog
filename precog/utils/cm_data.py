@@ -40,7 +40,7 @@ class CMData:
         if "time" in self._cache.columns:
             time_range = f" (time range: {self._cache['time'].min()} to {self._cache['time'].max()})"
 
-        bt.logging.info(f"CMData cache stats: Size={size_mb:.2f}MB, Rows={rows}{time_range}")
+        bt.logging.trace(f"CMData cache stats: Size={size_mb:.2f}MB, Rows={rows}{time_range}")
 
     def get_CM_ReferenceRate(
         self,

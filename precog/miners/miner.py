@@ -67,7 +67,7 @@ class Miner:
         else:
             # Fallback if using original CMData without monitoring
             cache_size = len(self.cm._cache) if hasattr(self.cm, "_cache") and not self.cm._cache.empty else 0
-            bt.logging.info(f"CMData cache size: {cache_size} rows")
+            bt.logging.trace(f"CMData cache size: {cache_size} rows")
 
     async def clear_cm_cache(self):
         """Periodically clears the CM cache to prevent memory growth."""
@@ -81,7 +81,6 @@ class Miner:
             bt.logging.info("Cache cleared and garbage collection triggered")
 
     async def resync_metagraph(self):
-        # self.subtensor = bt.subtensor(config=self.config, network=self.config.subtensor.chain_endpoint)
         bt.logging.info("Syncing Metagraph...")
         self.metagraph.sync(subtensor=self.subtensor)
         bt.logging.info("Metagraph updated, re-syncing hotkeys, dendrite pool and moving averages")

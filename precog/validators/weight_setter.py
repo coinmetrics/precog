@@ -113,7 +113,6 @@ class weight_setter:
         """Resyncs the metagraph and updates the hotkeys, available UIDs, and MinerHistory.
         Ensures all data structures remain in sync."""
         # Resync subtensor and metagraph
-        # self.subtensor = bt.subtensor(config=self.config, network=self.config.subtensor.chain_endpoint)
         bt.logging.info("Syncing Metagraph...")
         self.metagraph.sync(subtensor=self.subtensor)
         bt.logging.info("Metagraph updated, re-syncing hotkeys, dendrite pool and moving averages")
