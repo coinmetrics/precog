@@ -100,7 +100,7 @@ def calc_rewards(
 
 def interval_error(intervals, cm_prices):
     if intervals is None or len(intervals) <= 1:
-        return np.inf
+        return 0.0
 
     interval_errors = []
     for i, interval_to_evaluate in enumerate(intervals[:-1]):
@@ -129,7 +129,7 @@ def interval_error(intervals, cm_prices):
     error_array = np.array(interval_errors)
 
     if len(error_array) == 0 or np.all(np.isnan(error_array)):
-        return np.inf
+        return 0.0
 
     return np.nanmean(error_array).item()
 
