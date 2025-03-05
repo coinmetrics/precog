@@ -68,11 +68,11 @@ def calc_rewards(
         bt.logging.debug(
             f"UID: {uid} | AFTER ALIGNMENT: preds={len(preds)}, price={len(price)}, aligned_timestamps={len(aligned_pred_timestamps)}"
         )
-        for i, j, k in zip(preds, price, aligned_pred_timestamps):
-            bt.logging.debug(f"Prediction: {i} | Price: {j} | Aligned Prediction: {k}")
+        # for i, j, k in zip(preds, price, aligned_pred_timestamps):
+        #     bt.logging.debug(f"Prediction: {i} | Price: {j} | Aligned Prediction: {k}")
         inters, interval_prices, aligned_int_timestamps = align_timepoints(interval_dict, cm_data)
-        for i, j, k in zip(inters, interval_prices, aligned_int_timestamps):
-            bt.logging.debug(f"Interval: {i} | Interval Price: {j} | Aligned TS: {k}")
+        # for i, j, k in zip(inters, interval_prices, aligned_int_timestamps):
+        #     bt.logging.debug(f"Interval: {i} | Interval Price: {j} | Aligned TS: {k}")
         point_errors.append(point_error(preds, price))
         if any([np.isnan(inters).any(), np.isnan(interval_prices).any()]):
             interval_errors.append(0)
