@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import List
 
 from precog.utils.timestamp import get_now, get_timezone, round_minute_down, to_datetime
@@ -33,7 +33,6 @@ class MinerHistory:
         self.intervals = filtered_interval_dict
 
     def format_predictions(self, reference_timestamp=None, hours: int = 1):
-        # intervals = []
         if reference_timestamp is None:
             reference_timestamp = round_minute_down(get_now())
         if isinstance(reference_timestamp, str):
@@ -46,15 +45,3 @@ class MinerHistory:
             key: value for key, value in self.intervals.items() if start_time <= key <= reference_timestamp
         }
         return filtered_pred_dict, filtered_interval_dict
-
-    def get_relevant_timestamps(self, reference_timestamp: datetime):
-        # returns a list of aligned timestamps
-        # round down reference to nearest 5m
-        round_down_now = round_minute_down(reference_timestamp)
-        # get the timestamps for the past 12 epochs
-        timestamps = [round_down_now - timedelta(minutes=5 * i) for i in range(12)]
-        # remove any timestamps that are not in the dicts
-        filtered_list = [
-            item for item in timestamps if item in self.predictions.keys() and item in self.intervals.keys()
-        ]
-        return filtered_list

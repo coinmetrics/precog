@@ -39,8 +39,7 @@ class weight_setter:
     async def initialize(self):
         setup_bittensor_objects(self)
         self.timezone = timezone("UTC")
-        self.prediction_interval = self.config.prediction_interval  # in seconds
-        self.N_TIMEPOINTS = self.config.N_TIMEPOINTS  # number of timepoints to predict
+        self.prediction_interval = self.config.prediction_interval_minutes
         self.hyperparameters = func_with_retry(self.subtensor.get_subnet_hyperparameters, netuid=self.config.netuid)
         self.resync_metagraph_rate = 600  # in seconds
         bt.logging.info(

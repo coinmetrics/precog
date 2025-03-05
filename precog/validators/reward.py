@@ -15,7 +15,8 @@ def calc_rewards(
     self,
     responses: List[Challenge],
 ) -> np.ndarray:
-    evaluation_window_hours = self.config.evaluation_window
+    evaluation_window_hours = self.config.evaluation_window_hours
+
     # preallocate
     point_errors = []
     interval_errors = []
@@ -32,7 +33,6 @@ def calc_rewards(
     )
     cm_data = pd_to_dict(historical_price_data)
 
-    # TODO: Do we need to set a minimum amount of intervals for evaluation if we are increasing the evaluation window?
     for uid, response in zip(self.available_uids, responses):
         current_miner = self.MinerHistory[uid]
         self.MinerHistory[uid].add_prediction(response.timestamp, response.prediction, response.interval)
@@ -40,7 +40,13 @@ def calc_rewards(
             response.timestamp, hours=evaluation_window_hours
         )
         mature_time_dict = mature_dictionary(prediction_dict, hours=evaluation_window_hours)
+        bt.logging.debug(
+            f"UID: {uid} | LENGTHS: prediction_dict={len(prediction_dict)}, interval_dict={len(interval_dict)}, mature_time_dict={len(mature_time_dict)}"
+        )
         preds, price, aligned_pred_timestamps = align_timepoints(mature_time_dict, cm_data)
+        bt.logging.debug(
+            f"UID: {uid} | AFTER ALIGNMENT: preds={len(preds)}, price={len(price)}, aligned_timestamps={len(aligned_pred_timestamps)}"
+        )
         for i, j, k in zip(preds, price, aligned_pred_timestamps):
             bt.logging.debug(f"Prediction: {i} | Price: {j} | Aligned Prediction: {k}")
         inters, interval_prices, aligned_int_timestamps = align_timepoints(interval_dict, cm_data)
