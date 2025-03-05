@@ -88,6 +88,13 @@ def calc_rewards(
     point_ranks = rank(np.array(point_errors))
     interval_ranks = rank(-np.array(interval_errors))  # 1 is best, 0 is worst, so flip it
     rewards = (decayed_weights[point_ranks] + decayed_weights[interval_ranks]) / 2
+
+    bt.logging.debug(f"Point errors: {point_errors}")
+    bt.logging.debug(f"Point ranks: {point_ranks}")
+    bt.logging.debug(f"Interval errors: {interval_errors}")
+    bt.logging.debug(f"Interval ranks: {interval_ranks}")
+    bt.logging.debug(f"Decayed weights: {decayed_weights}")
+    bt.logging.debug(f"Final rewards: {rewards}")
     return rewards
 
 
