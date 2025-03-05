@@ -1,8 +1,6 @@
 from datetime import timedelta
 from typing import List
 
-import numpy as np
-
 from precog.utils.timestamp import get_now, get_timezone, round_minute_down, to_datetime
 
 
@@ -54,28 +52,4 @@ class MinerHistory:
             key: value for key, value in self.intervals.items() if start_time <= key <= reference_timestamp
         }
 
-        # Create complete dictionaries with all expected timepoints
-        complete_pred_dict = {}
-        complete_interval_dict = {}
-
-        # Generate all expected timepoints at the specified interval
-        current_time = start_time
-        while current_time <= reference_timestamp:
-            # For predictions
-            if current_time in filtered_pred_dict:
-                complete_pred_dict[current_time] = filtered_pred_dict[current_time]
-            else:
-                # Insert NaN for missing predictions
-                complete_pred_dict[current_time] = float("nan")
-
-            # For intervals
-            if current_time in filtered_interval_dict:
-                complete_interval_dict[current_time] = filtered_interval_dict[current_time]
-            else:
-                # Use NaN array for missing intervals
-                complete_interval_dict[current_time] = np.array([float("nan"), float("nan")])
-
-            # Move to next expected timepoint
-            current_time += timedelta(minutes=prediction_interval_minutes)
-
-        return complete_pred_dict, complete_interval_dict
+        return filtered_pred_dict, filtered_interval_dict
