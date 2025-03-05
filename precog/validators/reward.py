@@ -47,9 +47,8 @@ def calc_rewards(
         current_miner = self.MinerHistory[uid]
         self.MinerHistory[uid].add_prediction(response.timestamp, response.prediction, response.interval)
         # Get predictions from the evaluation window that have had time to mature
-        # (from 7 hours ago to 1 hour ago)
         prediction_dict, interval_dict = current_miner.format_predictions(
-            get_before(timestamp, hours=prediction_future_hours),  # Use 1 hour ago as reference
+            get_before(timestamp, hours=prediction_future_hours),
             hours=evaluation_window_hours,
         )
 
