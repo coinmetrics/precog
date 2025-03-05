@@ -7,7 +7,7 @@ from pandas import DataFrame
 from precog.protocol import Challenge
 from precog.utils.cm_data import CMData
 from precog.utils.general import pd_to_dict, rank
-from precog.utils.timestamp import align_timepoints, get_before, mature_dictionary, to_datetime, to_str
+from precog.utils.timestamp import align_timepoints, get_before, mature_dictionary, to_str
 
 
 ################################################################################
@@ -16,6 +16,7 @@ def calc_rewards(
     responses: List[Challenge],
 ) -> np.ndarray:
     evaluation_window_hours = self.config.evaluation_window_hours
+    prediction_future_hours = self.config.prediction_future_hours
 
     # preallocate
     point_errors = []
@@ -26,8 +27,11 @@ def calc_rewards(
     timestamp = responses[0].timestamp
     bt.logging.debug(f"Calculating rewards for timestamp: {timestamp}")
     cm = CMData()
-    start_time: str = to_str(get_before(timestamp=timestamp, hours=evaluation_window_hours))
-    end_time: str = to_str(to_datetime(timestamp))  # built-ins handle CM API's formatting
+    # Adjust time window to look at predictions that have had time to mature
+    # Start: (evaluation_window + prediction) hours ago
+    # End: 1 hour ago (to ensure all predictions have matured)
+    start_time: str = to_str(get_before(timestamp=timestamp, hours=evaluation_window_hours + prediction_future_hours))
+    end_time: str = to_str(get_before(timestamp=timestamp, hours=prediction_future_hours))
     # Query CM API for sample standard deviation of the 1s residuals
     historical_price_data: DataFrame = cm.get_CM_ReferenceRate(
         assets="BTC", start=start_time, end=end_time, frequency="1s"
@@ -42,10 +46,19 @@ def calc_rewards(
     for uid, response in zip(self.available_uids, responses):
         current_miner = self.MinerHistory[uid]
         self.MinerHistory[uid].add_prediction(response.timestamp, response.prediction, response.interval)
+        # Get predictions from the evaluation window that have had time to mature
+        # (from 7 hours ago to 1 hour ago)
         prediction_dict, interval_dict = current_miner.format_predictions(
-            response.timestamp, hours=evaluation_window_hours
+            get_before(timestamp, hours=prediction_future_hours),  # Use 1 hour ago as reference
+            hours=evaluation_window_hours,
         )
-        mature_time_dict = mature_dictionary(prediction_dict, hours=evaluation_window_hours)
+
+        # Mature the predictions (shift forward by 1 hour)
+        mature_time_dict = mature_dictionary(prediction_dict, hours=prediction_future_hours)
+
+        bt.logging.debug(
+            f"UID: {uid} | LENGTHS: prediction_dict={len(prediction_dict)}, mature_time_dict={len(mature_time_dict)}"
+        )
         bt.logging.debug(
             f"UID: {uid} | LENGTHS: prediction_dict={len(prediction_dict)}, interval_dict={len(interval_dict)}, mature_time_dict={len(mature_time_dict)}"
         )

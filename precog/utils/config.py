@@ -245,10 +245,10 @@ def add_validator_args(parser):
     )
 
     parser.add_argument(
-        "--min_prediction_percentage",
-        type=float,
-        help="Minimum percentage of expected predictions required to receive rewards (0-100)",
-        default=80.0,
+        "--prediction_future_hours",
+        type=int,
+        help="The number of hours in the future miners are making predictions for",
+        default=1,
     )
 
     parser.add_argument("--reset_state", action="store_true", dest="reset_state", help="Overwrites the state file")
