@@ -56,7 +56,9 @@ def calc_rewards(
         preds, price, aligned_pred_timestamps = align_timepoints(mature_time_dict, cm_data)
 
         num_predictions = len(preds) if preds is not None else 0
-        completeness_ratio = num_predictions / expected_timepoints
+
+        # Ensure a maximum ratio of 1.0
+        completeness_ratio = min(num_predictions / expected_timepoints, 1.0)
         completeness_scores.append(completeness_ratio)
         bt.logging.debug(
             f"UID: {uid} | Completeness: {completeness_ratio:.2f} ({num_predictions}/{expected_timepoints})"
