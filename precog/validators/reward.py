@@ -17,10 +17,13 @@ def calc_rewards(
 ) -> np.ndarray:
     evaluation_window_hours = self.config.evaluation_window_hours
     prediction_future_hours = self.config.prediction_future_hours
+    prediction_interval_minutes = self.config.prediction_interval_minutes
+    expected_timepoints = evaluation_window_hours * 60 / prediction_interval_minutes
 
     # preallocate
     point_errors = []
     interval_errors = []
+    completeness_scores = []
     decay = 0.9
     weights = np.linspace(0, len(self.available_uids) - 1, len(self.available_uids))
     decayed_weights = decay**weights
@@ -51,21 +54,52 @@ def calc_rewards(
         mature_time_dict = mature_dictionary(prediction_dict, hours=prediction_future_hours)
 
         preds, price, aligned_pred_timestamps = align_timepoints(mature_time_dict, cm_data)
+
+        num_predictions = len(preds) if preds is not None else 0
+        completeness_ratio = num_predictions / expected_timepoints
+        completeness_scores.append(completeness_ratio)
+        bt.logging.debug(
+            f"UID: {uid} | Completeness: {completeness_ratio:.2f} ({num_predictions}/{expected_timepoints})"
+        )
+
         # for i, j, k in zip(preds, price, aligned_pred_timestamps):
         #     bt.logging.debug(f"Prediction: {i} | Price: {j} | Aligned Prediction: {k}")
         inters, interval_prices, aligned_int_timestamps = align_timepoints(interval_dict, cm_data)
         # for i, j, k in zip(inters, interval_prices, aligned_int_timestamps):
         #     bt.logging.debug(f"Interval: {i} | Interval Price: {j} | Aligned TS: {k}")
-        point_errors.append(point_error(preds, price))
+
+        # Penalize miners with missing predictions by increasing their point error
+        if preds is None or len(preds) == 0:
+            point_errors.append(np.inf)  # Maximum penalty for no predictions
+        else:
+            # Calculate error as normal, but apply completeness penalty
+            base_point_error = point_error(preds, price)
+            # Apply penalty inversely proportional to completeness
+            # This will increase error for incomplete prediction sets
+            adjusted_point_error = base_point_error / completeness_ratio
+            point_errors.append(adjusted_point_error)
+
         if any([np.isnan(inters).any(), np.isnan(interval_prices).any()]):
             interval_errors.append(0)
         else:
-            interval_errors.append(interval_error(inters, interval_prices))
+            # Similarly, penalize interval errors for incompleteness
+            base_interval_error = interval_error(inters, interval_prices)
+            adjusted_interval_error = base_interval_error * completeness_ratio  # Lower score for incomplete sets
+            interval_errors.append(adjusted_interval_error)
+
         bt.logging.debug(f"UID: {uid} | point_errors: {point_errors[-1]} | interval_errors: {interval_errors[-1]}")
 
     point_ranks = rank(np.array(point_errors))
     interval_ranks = rank(-np.array(interval_errors))  # 1 is best, 0 is worst, so flip it
-    rewards = (decayed_weights[point_ranks] + decayed_weights[interval_ranks]) / 2
+    completeness_ranks = rank(-np.array(completeness_scores))
+
+    # Include completeness in the reward calculation
+    # Adjust the weighting as needed - here it's 40% point error, 40% interval error, 20% completeness
+    rewards = (
+        0.4 * decayed_weights[point_ranks]
+        + 0.4 * decayed_weights[interval_ranks]
+        + 0.2 * decayed_weights[completeness_ranks]
+    )
 
     return rewards
 
