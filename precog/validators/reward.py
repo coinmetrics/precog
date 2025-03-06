@@ -64,11 +64,11 @@ def calc_rewards(
             f"UID: {uid} | Completeness: {completeness_ratio:.2f} ({num_predictions}/{expected_timepoints})"
         )
 
-        # for i, j, k in zip(preds, price, aligned_pred_timestamps):
-        #     bt.logging.debug(f"Prediction: {i} | Price: {j} | Aligned Prediction: {k}")
+        for i, j, k in zip(preds, price, aligned_pred_timestamps):
+            bt.logging.debug(f"Prediction: {i} | Price: {j} | Aligned Prediction: {k}")
         inters, interval_prices, aligned_int_timestamps = align_timepoints(interval_dict, cm_data)
-        # for i, j, k in zip(inters, interval_prices, aligned_int_timestamps):
-        #     bt.logging.debug(f"Interval: {i} | Interval Price: {j} | Aligned TS: {k}")
+        for i, j, k in zip(inters, interval_prices, aligned_int_timestamps):
+            bt.logging.debug(f"Interval: {i} | Interval Price: {j} | Aligned TS: {k}")
 
         # Penalize miners with missing predictions by increasing their point error
         if preds is None or len(preds) == 0:
