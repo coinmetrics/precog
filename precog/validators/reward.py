@@ -91,15 +91,11 @@ def calc_rewards(
 
     point_ranks = rank(np.array(point_errors))
     interval_ranks = rank(-np.array(interval_errors))  # 1 is best, 0 is worst, so flip it
-    completeness_ranks = rank(-np.array(completeness_scores))
 
-    # Include completeness in the reward calculation
-    # Adjust the weighting as needed - here it's 40% point error, 40% interval error, 20% completeness
-    rewards = (
-        0.4 * decayed_weights[point_ranks]
-        + 0.4 * decayed_weights[interval_ranks]
-        + 0.2 * decayed_weights[completeness_ranks]
-    )
+    base_rewards = (decayed_weights[point_ranks] + decayed_weights[interval_ranks]) / 2
+
+    # Simply multiply the final rewards by the completeness score
+    rewards = base_rewards * np.array(completeness_scores)
 
     return rewards
 
