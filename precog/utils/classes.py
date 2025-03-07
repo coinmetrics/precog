@@ -38,13 +38,10 @@ class MinerHistory:
         if isinstance(reference_timestamp, str):
             reference_timestamp = to_datetime(reference_timestamp)
 
-        # Round reference timestamp down to nearest interval
         reference_timestamp = round_minute_down(reference_timestamp)
 
-        # Calculate start time
         start_time = round_minute_down(reference_timestamp) - timedelta(hours=hours + 1)
 
-        # Filter actual predictions made within the window
         filtered_pred_dict = {
             key: value for key, value in self.predictions.items() if start_time <= key <= reference_timestamp
         }
