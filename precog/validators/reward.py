@@ -4,6 +4,7 @@ import bittensor as bt
 import numpy as np
 from pandas import DataFrame
 
+from precog import constants
 from precog.protocol import Challenge
 from precog.utils.cm_data import CMData
 from precog.utils.general import pd_to_dict, rank
@@ -15,9 +16,10 @@ def calc_rewards(
     self,
     responses: List[Challenge],
 ) -> np.ndarray:
-    evaluation_window_hours = self.config.evaluation_window_hours
-    prediction_future_hours = self.config.prediction_future_hours
-    prediction_interval_minutes = self.config.prediction_interval_minutes
+    evaluation_window_hours = constants.EVALUATION_WINDOW_HOURS
+    prediction_future_hours = constants.PREDICTION_FUTURE_HOURS
+    prediction_interval_minutes = constants.PREDICTION_INTERVAL_MINUTES
+
     expected_timepoints = evaluation_window_hours * 60 / prediction_interval_minutes
 
     # preallocate
@@ -32,7 +34,7 @@ def calc_rewards(
     cm = CMData()
     # Adjust time window to look at predictions that have had time to mature
     # Start: (evaluation_window + prediction) hours ago
-    # End: 1 hour ago (to ensure all predictions have matured)
+    # End: prediction_future_hours ago (to ensure all predictions have matured)
     start_time: str = to_str(get_before(timestamp=timestamp, hours=evaluation_window_hours + prediction_future_hours))
     end_time: str = to_str(to_datetime(get_before(timestamp=timestamp, hours=prediction_future_hours)))
     # Query CM API for sample standard deviation of the 1s residuals
@@ -46,7 +48,7 @@ def calc_rewards(
         self.MinerHistory[uid].add_prediction(response.timestamp, response.prediction, response.interval)
         # Get predictions from the evaluation window that have had time to mature
         prediction_dict, interval_dict = current_miner.format_predictions(
-            get_before(timestamp, hours=prediction_future_hours),
+            reference_timestamp=get_before(timestamp, hours=prediction_future_hours),
             hours=evaluation_window_hours,
         )
 

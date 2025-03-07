@@ -233,24 +233,6 @@ def add_validator_args(parser):
         default="opentensor-dev",
     )
 
-    parser.add_argument(
-        "--prediction_interval_minutes", type=int, help="How often predictions are requested from miners", default=5
-    )
-
-    parser.add_argument(
-        "--evaluation_window_hours",
-        type=int,
-        help="The number of hours to include prediction history for when evaluating miners",
-        default=6,
-    )
-
-    parser.add_argument(
-        "--prediction_future_hours",
-        type=int,
-        help="The number of hours in the future miners are making predictions for",
-        default=1,
-    )
-
     parser.add_argument("--reset_state", action="store_true", dest="reset_state", help="Overwrites the state file")
 
 

@@ -6,7 +6,7 @@ import bittensor as bt
 from numpy import array
 from pytz import timezone
 
-from precog import __spec_version__
+from precog import __spec_version__, constants
 from precog.protocol import Challenge
 from precog.utils.bittensor import check_uid_availability, print_info, setup_bittensor_objects
 from precog.utils.classes import MinerHistory
@@ -39,7 +39,7 @@ class weight_setter:
     async def initialize(self):
         setup_bittensor_objects(self)
         self.timezone = timezone("UTC")
-        self.prediction_interval = self.config.prediction_interval_minutes
+        self.prediction_interval = constants.PREDICTION_INTERVAL_MINUTES
         self.hyperparameters = func_with_retry(self.subtensor.get_subnet_hyperparameters, netuid=self.config.netuid)
         self.resync_metagraph_rate = 600  # in seconds
         bt.logging.info(
