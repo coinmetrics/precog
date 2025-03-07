@@ -38,8 +38,6 @@ class MinerHistory:
         if isinstance(reference_timestamp, str):
             reference_timestamp = to_datetime(reference_timestamp)
 
-        reference_timestamp = round_minute_down(reference_timestamp)
-
         start_time = round_minute_down(reference_timestamp) - timedelta(hours=hours + 1)
 
         filtered_pred_dict = {
