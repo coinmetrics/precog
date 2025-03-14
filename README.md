@@ -1,12 +1,7 @@
-
-
-
-
-
-
-
 <div align="center">
+
 # **CoinMetrics Precog Subnet** <!-- omit in toc -->
+
 <div align="center">
 
 | **Testnet UID:**  256 <br> **Mainnet UID:**  55 |
