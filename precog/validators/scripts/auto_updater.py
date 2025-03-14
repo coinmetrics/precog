@@ -82,6 +82,7 @@ def main(path) -> bool:
         repo.git.stash('push')
         stashed = True
     else:
+        bt.logging.debug("No local changes detected. Stashing not required.")
         stashed = False
 
     # Try pulling with retries
