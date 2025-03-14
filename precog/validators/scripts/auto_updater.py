@@ -19,9 +19,13 @@ def git_pull_change(path, max_retries=3, retry_delay=5) -> bool:
     repo = git.Repo(path)
     current_hash = repo.head.commit
 
-    # Notify of observed local changes
+    # Check for unstaged changes and cache if needed
     if repo.is_dirty():
-        bt.logging.debug("Local changes detected.")
+        bt.logging.debug("Local changes detected. Stashing changes now.")
+        repo.git.stash('save')
+        stashed = True
+    else:
+        stashed = False
 
     # Try pulling with retries
     for attempt in range(max_retries):
@@ -30,23 +34,6 @@ def git_pull_change(path, max_retries=3, retry_delay=5) -> bool:
             repo.remotes.origin.pull(rebase=True)
             bt.logging.debug("Pull complete.")
             break
-
-        except GitCommandError as e:
-            if "merge conflicts" in str(e):
-                bt.logging.debug("Merge conflicts detected. Reverting to the previous state.")
-                repo.git.merge('--abort')
-                bt.logging.debug("Stopping the pm2 process for the auto updater.")
-                return
-
-            else:
-                bt.logging.debug(f"An error occurred: {e}")
-                if attempt < max_retries - 1:  # Don't sleep on the last attempt
-                    bt.logging.debug(f"Pull attempt {attempt + 1} failed: {str(e)}")
-                    bt.logging.debug(f"Retrying in {retry_delay} seconds...")
-                    time.sleep(retry_delay)
-                else:
-                    bt.logging.debug(f"All pull attempts failed. Last error: {str(e)}")
-                    raise  # Re-raise the last exception if all retries failed
 
         except Exception as e:
             if attempt < max_retries - 1:  # Don't sleep on the last attempt
@@ -62,8 +49,40 @@ def git_pull_change(path, max_retries=3, retry_delay=5) -> bool:
     bt.logging.debug(f"Current hash: {current_hash}")
     bt.logging.debug(f"New hash: {new_hash}")
 
-    # Return True if the hash has changed
-    return current_hash != new_hash
+    # If there are no changes observed on GitHub
+    if current_hash == new_hash:
+        bt.logging.debug("No new commits on GitHub.")
+
+        # Reapply the stash
+        if stashed:
+            repo.git.stash("pop")
+            bt.logging.debug("Successfully reapplied stashed changes.")
+
+        # Return False if the hash has not changed
+        return False
+    
+    else:
+        bt.logging.debug("New commits observed on GitHub.")
+
+        # Reapply the stash
+        if stashed:
+            try:
+                repo.git.stash('pop')
+                bt.logging.debug("Successfully reapplied stashed changes.")
+            except GitCommandError as e:
+                bt.logging.debug("Conflicts while reapplying stash. Rolling back...")
+                
+                repo.git.reset('--hard', current_hash)  # Reset to original state
+                repo.git.stash('pop')  # Restore original changes
+                
+                bt.logging.debug("Rolled back to original state with local changes.")
+                bt.logging.debug(f"Currently on commit hash: {current_hash}")
+                bt.logging.debug("Ending the auto update pm2 process. Human intervention is required to resolve merge conflicts.")
+                
+                return None
+            
+        # Return True if the hash has changed
+        return True
 
 
 if __name__ == "__main__":
