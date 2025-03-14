@@ -4,10 +4,10 @@ import time
 
 import bittensor as bt
 import git
+from git.exc import GitCommandError
 
 import precog
 from precog.utils.timestamp import elapsed_seconds, get_now
-from git.exc import GitCommandError
 
 # Frequency of the auto updater in minutes
 TIME_INTERVAL = 5
@@ -23,20 +23,20 @@ def git_apply_stash(repo: git.Repo, old_commit_hash: str) -> bool:
     except GitCommandError as e:
         bt.logging.debug(f"Error observed while applying stash: `{str(e)}`")
         bt.logging.debug("Rolling back...")
-        
+
         bt.logging.debug(f"Rolling back to commit hash `{old_commit_hash}`")
-        repo.git.reset('--hard', old_commit_hash)  # Reset to original state
-        
+        repo.git.reset("--hard", old_commit_hash)  # Reset to original state
+
         repo.git.stash("apply", "--index")  # Restore original changes
         bt.logging.debug("Reapplied stashed changes. Dropping stash now.")
-        repo.git.stash("drop") # Drop the most recent stash
-        
+        repo.git.stash("drop")  # Drop the most recent stash
+
         bt.logging.debug("Rolled back to original state with local changes.")
         bt.logging.debug(f"Currently on commit hash: {old_commit_hash}")
-        
+
         # Return False if rollback was required
         return False
-    
+
     # Applying the stash was successful
     else:
         bt.logging.debug("Successfully reapplied stashed changes. Dropping stash now.")
@@ -46,8 +46,9 @@ def git_apply_stash(repo: git.Repo, old_commit_hash: str) -> bool:
 
         # Return True if stash was successfully applied
         return True
-    
-def git_pull(repo: git.Repo, max_retries: int=3, retry_delay: int=5) -> bool:
+
+
+def git_pull(repo: git.Repo, max_retries: int = 3, retry_delay: int = 5) -> bool:
     # Try pulling with retries
     for attempt in range(max_retries):
         try:
@@ -61,14 +62,12 @@ def git_pull(repo: git.Repo, max_retries: int=3, retry_delay: int=5) -> bool:
                 time.sleep(retry_delay)
             else:
                 bt.logging.debug(f"All pull attempts failed. Last error: {str(e)}")
-                
+
                 return False
 
         else:
             bt.logging.debug("Pull complete.")
             return True
-
-
 
 
 def main(path) -> bool:
@@ -79,7 +78,7 @@ def main(path) -> bool:
     # Check for unstaged changes and cache if needed
     if repo.is_dirty():
         bt.logging.debug("Local changes detected. Stashing changes now.")
-        repo.git.stash('push')
+        repo.git.stash("push")
         stashed = True
     else:
         bt.logging.debug("No local changes detected. Stashing not required.")
@@ -101,7 +100,9 @@ def main(path) -> bool:
 
     # If we pulled successfully but had to rollback
     elif not stash_success:
-        raise RuntimeError("Local changes are not compatible with new commits observed on GitHub. Manual intervention to update the code is required. Killing the auto updater pm2 process.")
+        raise RuntimeError(
+            "Local changes are not compatible with new commits observed on GitHub. Manual intervention to update the code is required. Killing the auto updater pm2 process."
+        )
 
     # Pull and stash succeeded
     else:
