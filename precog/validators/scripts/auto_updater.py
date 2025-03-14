@@ -22,7 +22,7 @@ def git_pull_change(path, max_retries=3, retry_delay=5) -> bool:
     # Check for unstaged changes and cache if needed
     if repo.is_dirty():
         bt.logging.debug("Local changes detected. Stashing changes now.")
-        repo.git.stash('save')
+        repo.git.stash('push')
         stashed = True
     else:
         stashed = False
@@ -55,7 +55,7 @@ def git_pull_change(path, max_retries=3, retry_delay=5) -> bool:
 
         # Reapply the stash
         if stashed:
-            repo.git.stash("pop")
+            repo.git.stash("apply", "--index")
             bt.logging.debug("Successfully reapplied stashed changes.")
 
         # Return False if the hash has not changed
@@ -67,13 +67,13 @@ def git_pull_change(path, max_retries=3, retry_delay=5) -> bool:
         # Reapply the stash
         if stashed:
             try:
-                repo.git.stash('pop')
+                repo.git.stash("apply", "--index")
                 bt.logging.debug("Successfully reapplied stashed changes.")
             except GitCommandError as e:
                 bt.logging.debug("Conflicts while reapplying stash. Rolling back...")
                 
                 repo.git.reset('--hard', current_hash)  # Reset to original state
-                repo.git.stash('pop')  # Restore original changes
+                repo.git.stash("apply", "--index")  # Restore original changes
                 
                 bt.logging.debug("Rolled back to original state with local changes.")
                 bt.logging.debug(f"Currently on commit hash: {current_hash}")
