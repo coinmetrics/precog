@@ -24,8 +24,11 @@ def git_apply_stash(repo: git.Repo, old_commit_hash: str) -> bool:
         bt.logging.debug(f"Error observed while applying stash: `{str(e)}`")
         bt.logging.debug("Rolling back...")
         
+        bt.logging.debug(f"Rolling back to commit hash `{old_commit_hash}`")
         repo.git.reset('--hard', old_commit_hash)  # Reset to original state
+        
         repo.git.stash("apply", "--index")  # Restore original changes
+        bt.logging.debug("Reapplied stashed changes. Dropping stash now.")
         repo.git.stash("drop") # Drop the most recent stash
         
         bt.logging.debug("Rolled back to original state with local changes.")
@@ -95,7 +98,7 @@ def main(path) -> bool:
         # TODO: End the pm2 process?
         pass
 
-    # If we pulled successfully but had stash conflicts
+    # If we pulled successfully but had to rollback
     elif not stash_success:
         # TODO: End the pm2 process?
         pass
