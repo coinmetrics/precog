@@ -101,8 +101,7 @@ def main(path) -> bool:
 
     # If we pulled successfully but had to rollback
     elif not stash_success:
-        # TODO: End the pm2 process?
-        pass
+        raise RuntimeError("Local changes are not compatible with new commits observed on GitHub. Manual intervention to update the code is required. Killing the auto updater pm2 process.")
 
     # Pull and stash succeeded
     else:
