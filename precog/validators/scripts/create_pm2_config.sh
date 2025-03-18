@@ -31,10 +31,11 @@ if [[ $AUTO_UPDATE == 1 ]]; then
     echo ",
     {
     name: '$AUTO_UPDATE_PROC_NAME',
+    autorestart: false,
+    instances: 1,
+    cron_restart: '2/5 * * * *',
     script: 'poetry',
     interpreter: 'python3',
-    min_uptime: '5m',
-    max_restarts: '5',
     args: [
         'run',
         'python',
