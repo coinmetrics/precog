@@ -7,9 +7,6 @@ import git
 
 import precog
 
-# Frequency of the auto updater in minutes
-TIME_INTERVAL = 5
-
 
 def git_pull_change(path, max_retries=3, retry_delay=5) -> bool:
     # Load the git repository
@@ -69,7 +66,6 @@ if __name__ == "__main__":
     else:
         bt.logging.debug("Repository has changed!")
 
-        # This code is only reached when the repo has changed
         # We can now restart both pm2 processes, including the auto updater
         bt.logging.debug("Installing dependencies...")
         subprocess.run(["poetry", "install"], cwd=git_repo_path)
