@@ -7,7 +7,6 @@ import git
 from git.exc import GitCommandError
 
 import precog
-from precog.utils.timestamp import elapsed_seconds, get_now
 
 # Frequency of the auto updater in minutes
 TIME_INTERVAL = 5
@@ -125,8 +124,8 @@ if __name__ == "__main__":
 
     bt.logging.debug("Checking for repository changes...")
 
-            # Pull the latest changes from github
-            has_changed = main(git_repo_path)
+    # Pull the latest changes from github
+    has_changed = main(git_repo_path)
 
     # If the repo has not changed
     if not has_changed:
