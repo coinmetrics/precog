@@ -22,6 +22,7 @@ from precog.utils.timestamp import (
 )
 from precog.utils.wandb import log_wandb, setup_wandb
 from precog.validators.reward import calc_rewards
+from precog.validators.server import Server
 
 
 class weight_setter:
@@ -38,6 +39,7 @@ class weight_setter:
 
     async def initialize(self):
         setup_bittensor_objects(self)
+        self.server = Server(self)
         self.timezone = timezone("UTC")
         self.prediction_interval = constants.PREDICTION_INTERVAL_MINUTES
         self.hyperparameters = func_with_retry(self.subtensor.get_subnet_hyperparameters, netuid=self.config.netuid)

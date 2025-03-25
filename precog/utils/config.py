@@ -233,7 +233,26 @@ def add_validator_args(parser):
         default="opentensor-dev",
     )
 
-    parser.add_argument("--reset_state", action="store_true", dest="reset_state", help="Overwrites the state file")
+    parser.add_argument(
+        "--server.port",
+        type=int,
+        help="The port to run the fastapi server on.",
+        default=10891,
+    )
+
+    parser.add_argument(
+        "--server.proxy_client_url",
+        type=str,
+        help="The url of the frontend to interact with.",
+        default="https://placeholderurl.com",
+    )
+
+    parser.add_argument(
+        "--reset_state", 
+        action="store_true", 
+        dest="reset_state", 
+        help="Overwrites the state file"
+    )
 
 
 def to_string(bt_config: bt.Config):
