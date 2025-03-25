@@ -1,6 +1,12 @@
 Release Notes
 =============
 
+2.4.0
+-----
+Released on March 25th 2025
+- Update dependencies to be compatible with latest Bittensor v9.1.0
+- Enhance auto updater reliability and stashing mechanics
+
 2.3.0
 -----
 Released on March 10th 2025
