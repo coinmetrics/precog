@@ -49,37 +49,35 @@ def rank(vector):
         return rank_vector
 
 
-def get_average_weights_for_ties(ranks, decay=0.9):
+def get_average_weights_for_ties_function(ranks, decay=0.9):
     """
-    Calculates weights based on ranks, handling ties by averaging weights for tied positions.
-    When miners are tied, they get the average weight of all positions they occupy.
-
-    Args:
-        ranks: Array of ranks (ties will have the same rank).
-        decay: Decay factor for weights (default: 0.9).
-
-    Returns:
-        Array of weights corresponding to each rank.
+    Corrected implementation that properly averages weights for tied positions.
     """
     n = len(ranks)
     base_weights = decay ** np.arange(n)
 
     weights = np.zeros_like(ranks, dtype=float)
-    unique_ranks = np.unique(ranks)
 
-    rank_to_indices = {rank: np.where(ranks == rank)[0] for rank in unique_ranks}
+    sorted_indices = np.argsort(ranks)
+    sorted_ranks = ranks[sorted_indices]
 
-    for rank in unique_ranks:
-        indices = rank_to_indices[rank]
+    pos = 0
+    while pos < n:
+        current_rank = sorted_ranks[pos]
 
-        if len(indices) > 1:
-            positions = np.arange(indices[0], indices[0] + len(indices))
-            position_weights = [base_weights[pos] for pos in positions if pos < n]
-            avg_weight = np.mean(position_weights)
+        tie_indices = np.where(sorted_ranks == current_rank)[0]
+        tie_size = len(tie_indices)
 
-            weights[indices] = avg_weight
-        else:
-            weights[indices] = base_weights[indices[0]]
+        start_pos = tie_indices[0]
+        end_pos = start_pos + tie_size - 1
+
+        position_weights = base_weights[start_pos : end_pos + 1]
+        avg_weight = np.mean(position_weights)
+
+        for idx in sorted_indices[tie_indices]:
+            weights[idx] = avg_weight
+
+        pos += tie_size
 
     return weights
 
