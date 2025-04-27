@@ -65,7 +65,7 @@ def get_average_weights_for_ties_function(ranks, decay=0.9):
     while pos < n:
         current_rank = sorted_ranks[pos]
 
-        tie_indices = np.where(sorted_ranks == current_rank)[0]
+        tie_indices = np.nonzero(sorted_ranks == current_rank)[0]
         tie_size = len(tie_indices)
 
         start_pos = tie_indices[0]
