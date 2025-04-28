@@ -7,7 +7,7 @@ from pandas import DataFrame
 from precog import constants
 from precog.protocol import Challenge
 from precog.utils.cm_data import CMData
-from precog.utils.general import pd_to_dict, rank
+from precog.utils.general import get_average_weights_for_ties, pd_to_dict, rank
 from precog.utils.timestamp import align_timepoints, get_before, mature_dictionary, to_datetime, to_str
 
 
@@ -27,8 +27,6 @@ def calc_rewards(
     interval_errors = []
     completeness_scores = []
     decay = 0.9
-    weights = np.linspace(0, len(self.available_uids) - 1, len(self.available_uids))
-    decayed_weights = decay**weights
     timestamp = responses[0].timestamp
     bt.logging.debug(f"Calculating rewards for timestamp: {timestamp}")
     cm = CMData()
@@ -96,9 +94,10 @@ def calc_rewards(
     point_ranks = rank(np.array(point_errors))
     interval_ranks = rank(-np.array(interval_errors))  # 1 is best, 0 is worst, so flip it
 
-    base_rewards = (decayed_weights[point_ranks] + decayed_weights[interval_ranks]) / 2
+    point_weights = get_average_weights_for_ties(point_ranks, decay)
+    interval_weights = get_average_weights_for_ties(interval_ranks, decay)
 
-    # Simply multiply the final rewards by the completeness score
+    base_rewards = (point_weights + interval_weights) / 2
     rewards = base_rewards * np.array(completeness_scores)
 
     return rewards

@@ -5,6 +5,7 @@ from typing import Any, Callable, Optional
 
 import bittensor as bt
 import git
+import numpy as np
 import requests
 from numpy import argsort, array, concatenate, cumsum, empty_like
 from pandas import DataFrame
@@ -46,6 +47,39 @@ def rank(vector):
         rank_vector = empty_like(vector, dtype=int)
         rank_vector[sorted_indices] = ranks
         return rank_vector
+
+
+def get_average_weights_for_ties(ranks, decay=0.9):
+    """
+    Corrected implementation that properly averages weights for tied positions.
+    """
+    n = len(ranks)
+    base_weights = decay ** np.arange(n)
+
+    weights = np.zeros_like(ranks, dtype=float)
+
+    sorted_indices = np.argsort(ranks)
+    sorted_ranks = ranks[sorted_indices]
+
+    pos = 0
+    while pos < n:
+        current_rank = sorted_ranks[pos]
+
+        tie_indices = np.nonzero(sorted_ranks == current_rank)[0]
+        tie_size = len(tie_indices)
+
+        start_pos = tie_indices[0]
+        end_pos = start_pos + tie_size - 1
+
+        position_weights = base_weights[start_pos : end_pos + 1]
+        avg_weight = np.mean(position_weights)
+
+        for idx in sorted_indices[tie_indices]:
+            weights[idx] = avg_weight
+
+        pos += tie_size
+
+    return weights
 
 
 async def loop_handler(self, func: Callable, sleep_time: float = 120):
