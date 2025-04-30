@@ -2,7 +2,7 @@ Release Notes
 =============
 2.4.1
 -----
-Released on April 28th 2025
+Released on April 30th 2025
 - Update how rewards mechanism handles tied evaluations
 
 2.4.0
