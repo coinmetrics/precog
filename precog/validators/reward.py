@@ -95,7 +95,7 @@ def calc_rewards(
             adjusted_interval_score = base_interval_score * completeness_ratio
             interval_scores.append(adjusted_interval_score)
 
-        # bt.logging.debug(f"UID: {uid} | point_errors: {point_errors[-1]} | interval_scores: {interval_scores[-1]}")
+        bt.logging.debug(f"UID: {uid} | point_errors: {point_errors[-1]} | interval_scores: {interval_scores[-1]}")
 
     point_ranks = rank(np.array(point_errors))
     interval_ranks = rank(-np.array(interval_scores))  # 1 is best, 0 is worst, so flip it
