@@ -24,7 +24,7 @@ def calc_rewards(
 
     # preallocate
     point_errors = []
-    interval_errors = []
+    interval_scores = []
     completeness_scores = []
     decay = 0.9
     timestamp = responses[0].timestamp
@@ -89,16 +89,16 @@ def calc_rewards(
             )
 
         if any([np.isnan(inters).any(), np.isnan(interval_prices).any()]):
-            interval_errors.append(0)
+            interval_scores.append(0)
         else:
-            base_interval_error = interval_error(inters, interval_prices, uid=uid, timestamps=aligned_int_timestamps)
-            adjusted_interval_error = base_interval_error * completeness_ratio
-            interval_errors.append(adjusted_interval_error)
+            base_interval_score = interval_score(inters, interval_prices, uid=uid, timestamps=aligned_int_timestamps)
+            adjusted_interval_score = base_interval_score * completeness_ratio
+            interval_scores.append(adjusted_interval_score)
 
-        # bt.logging.debug(f"UID: {uid} | point_errors: {point_errors[-1]} | interval_errors: {interval_errors[-1]}")
+        # bt.logging.debug(f"UID: {uid} | point_errors: {point_errors[-1]} | interval_scores: {interval_scores[-1]}")
 
     point_ranks = rank(np.array(point_errors))
-    interval_ranks = rank(-np.array(interval_errors))  # 1 is best, 0 is worst, so flip it
+    interval_ranks = rank(-np.array(interval_scores))  # 1 is best, 0 is worst, so flip it
 
     point_weights = get_average_weights_for_ties(point_ranks, decay)
     interval_weights = get_average_weights_for_ties(interval_ranks, decay)
@@ -109,7 +109,7 @@ def calc_rewards(
     return rewards
 
 
-def interval_error(intervals, cm_prices, uid=None, timestamps=None):  # noqa: C901
+def interval_score(intervals, cm_prices, uid=None, timestamps=None):
     if intervals is None:
         return np.array([0])
     else:
@@ -122,110 +122,68 @@ def interval_error(intervals, cm_prices, uid=None, timestamps=None):  # noqa: C9
 
         if should_log:
             bt.logging.debug("=" * 50)
-            bt.logging.debug(f"INTERVAL ERROR COMPARISON FOR UID {uid}")
-            bt.logging.debug("Constants:")
-            bt.logging.debug(f"  - PREDICTION_INTERVAL_MINUTES: {constants.PREDICTION_INTERVAL_MINUTES}")
-            bt.logging.debug(f"  - PREDICTION_FUTURE_HOURS: {constants.PREDICTION_FUTURE_HOURS}")
-            bt.logging.debug(f"  - Calculated intervals_per_hour: {intervals_per_hour}")
-            bt.logging.debug(f"  - Calculated prediction_window: {prediction_window}")
-            bt.logging.debug("Input data:")
-            bt.logging.debug(f"  - Number of intervals: {len(intervals)}")
-            bt.logging.debug(f"  - Number of prices: {len(cm_prices)}")
+            bt.logging.debug(f"INTERVAL ERROR CALCULATION FOR UID {uid}")
+            bt.logging.debug(
+                f"Prediction window: {prediction_window} intervals ({constants.PREDICTION_FUTURE_HOURS} hour)"
+            )
+            bt.logging.debug(f"Total intervals to evaluate: {len(intervals) - 1}")
             bt.logging.debug("=" * 50)
 
-        old_interval_errors = []
-        new_interval_errors = []
+        interval_scores = []
 
         for i, interval_to_evaluate in enumerate(intervals[:-1]):
+            # Check if we have enough future data for a complete prediction window
+            if i + 1 + prediction_window > len(cm_prices):
+                if should_log:
+                    bt.logging.debug(f"Interval {i}: Skipping - insufficient future data")
+                break
+
+            # Get bounds of the prediction interval
             lower_bound_prediction = np.min(interval_to_evaluate)
             upper_bound_prediction = np.max(interval_to_evaluate)
 
-            # OLD METHOD - evaluating against all future prices
-            old_prices_slice = cm_prices[i + 1 :]
-            old_slice_size = len(old_prices_slice)
+            # Get only the next hour of prices (the prediction window)
+            future_prices = cm_prices[i + 1 : i + 1 + prediction_window]
 
-            # NEW METHOD - only next prediction_window prices
-            new_end_index = min(i + 1 + prediction_window, len(cm_prices))
-            new_prices_slice = cm_prices[i + 1 : new_end_index]
-            new_slice_size = len(new_prices_slice)
+            # Calculate effective bounds (overlap between prediction and actual)
+            effective_min = np.max([lower_bound_prediction, np.min(future_prices)])
+            effective_max = np.min([upper_bound_prediction, np.max(future_prices)])
 
-            # Skip if we don't have enough future data for new method
-            if new_slice_size < prediction_window:
-                if should_log:
-                    bt.logging.debug(f"\nInterval {i}: Skipping - only {new_slice_size} future prices available")
-                # For old method, still calculate if there's any data
-                if old_slice_size > 0:
-                    old_effective_min = np.max([lower_bound_prediction, np.min(old_prices_slice)])
-                    old_effective_max = np.min([upper_bound_prediction, np.max(old_prices_slice)])
-                    old_f_w = (old_effective_max - old_effective_min) / (
-                        upper_bound_prediction - lower_bound_prediction
-                    )
-                    old_f_i = sum(
-                        (old_prices_slice >= lower_bound_prediction) & (old_prices_slice <= upper_bound_prediction)
-                    ) / len(old_prices_slice)
-                    old_interval_errors.append(old_f_w * old_f_i)
-                break
+            # Calculate width factor (f_w): how much of the prediction was "used"
+            f_w = (effective_max - effective_min) / (upper_bound_prediction - lower_bound_prediction)
 
-            # Calculate OLD method scores
-            old_effective_min = np.max([lower_bound_prediction, np.min(old_prices_slice)])
-            old_effective_max = np.min([upper_bound_prediction, np.max(old_prices_slice)])
-            old_f_w = (old_effective_max - old_effective_min) / (upper_bound_prediction - lower_bound_prediction)
-            old_f_i = sum(
-                (old_prices_slice >= lower_bound_prediction) & (old_prices_slice <= upper_bound_prediction)
-            ) / len(old_prices_slice)
-            old_score = old_f_w * old_f_i
-            old_interval_errors.append(old_score)
+            # Calculate inclusion factor (f_i): what % of prices fell within prediction
+            f_i = sum((future_prices >= lower_bound_prediction) & (future_prices <= upper_bound_prediction)) / len(
+                future_prices
+            )
 
-            # Calculate NEW method scores
-            new_effective_min = np.max([lower_bound_prediction, np.min(new_prices_slice)])
-            new_effective_max = np.min([upper_bound_prediction, np.max(new_prices_slice)])
-            new_f_w = (new_effective_max - new_effective_min) / (upper_bound_prediction - lower_bound_prediction)
-            new_f_i = sum(
-                (new_prices_slice >= lower_bound_prediction) & (new_prices_slice <= upper_bound_prediction)
-            ) / len(new_prices_slice)
-            new_score = new_f_w * new_f_i
-            new_interval_errors.append(new_score)
+            # Final score for this interval
+            interval_score = f_w * f_i
+            interval_scores.append(interval_score)
 
-            if should_log:
+            if should_log and i < 5:  # Log first 5 intervals for debugging
                 bt.logging.debug(f"\nInterval {i}:")
                 if timestamps and i < len(timestamps):
                     bt.logging.debug(f"  Timestamp: {timestamps[i]}")
-                bt.logging.debug(f"  Interval bounds: [{lower_bound_prediction:.2f}, {upper_bound_prediction:.2f}]")
-                bt.logging.debug("  OLD METHOD:")
-                bt.logging.debug(f"    - Evaluating against {old_slice_size} future prices")
-                bt.logging.debug(f"    - Price range: [{np.min(old_prices_slice):.2f}, {np.max(old_prices_slice):.2f}]")
-                bt.logging.debug(f"    - Effective range: [{old_effective_min:.2f}, {old_effective_max:.2f}]")
-                bt.logging.debug(f"    - f_w: {old_f_w:.4f}, f_i: {old_f_i:.4f}, score: {old_score:.4f}")
-                bt.logging.debug("  NEW METHOD:")
-                bt.logging.debug(f"    - Evaluating against {new_slice_size} future prices")
-                bt.logging.debug(f"    - Price range: [{np.min(new_prices_slice):.2f}, {np.max(new_prices_slice):.2f}]")
-                bt.logging.debug(f"    - Effective range: [{new_effective_min:.2f}, {new_effective_max:.2f}]")
-                bt.logging.debug(f"    - f_w: {new_f_w:.4f}, f_i: {new_f_i:.4f}, score: {new_score:.4f}")
-                bt.logging.debug(
-                    f"  DIFFERENCE: {new_score - old_score:.4f} ({((new_score - old_score) / old_score * 100):.1f}%)"
-                )
+                bt.logging.debug(f"  Prediction: [{lower_bound_prediction:.2f}, {upper_bound_prediction:.2f}]")
+                bt.logging.debug(f"  Actual range: [{np.min(future_prices):.2f}, {np.max(future_prices):.2f}]")
+                bt.logging.debug(f"  Effective range: [{effective_min:.2f}, {effective_max:.2f}]")
+                bt.logging.debug(f"  Width factor: {f_w:.4f}")
+                bt.logging.debug(f"  Inclusion factor: {f_i:.4f}")
+                bt.logging.debug(f"  Score: {interval_score:.4f}")
 
-        # Calculate mean errors
-        old_mean_error = np.nanmean(np.array(old_interval_errors)).item() if old_interval_errors else 0
-        new_mean_error = np.nanmean(np.array(new_interval_errors)).item() if new_interval_errors else 0
+        # Calculate mean score
+        if len(interval_scores) == 0:
+            mean_score = 0.0
+        else:
+            mean_score = np.nanmean(np.array(interval_scores)).item()
 
         if should_log:
-            bt.logging.debug("\n" + "=" * 50)
-            bt.logging.debug("FINAL COMPARISON:")
-            bt.logging.debug("OLD METHOD:")
-            bt.logging.debug(f"  - Intervals evaluated: {len(old_interval_errors)}")
-            bt.logging.debug(f"  - Mean score: {old_mean_error:.4f}")
-            bt.logging.debug("NEW METHOD:")
-            bt.logging.debug(f"  - Intervals evaluated: {len(new_interval_errors)}")
-            bt.logging.debug(f"  - Mean score: {new_mean_error:.4f}")
-            bt.logging.debug(
-                f"DIFFERENCE: {new_mean_error - old_mean_error:.4f} ({((new_mean_error - old_mean_error) / old_mean_error * 100):.1f}%)"
-            )
+            bt.logging.debug(f"\nFinal mean score: {mean_score:.4f}")
+            bt.logging.debug(f"Intervals evaluated: {len(interval_scores)}")
             bt.logging.debug("=" * 50)
 
-        # Return the OLD method for now (to maintain current behavior)
-        # Change this to new_mean_error when ready to switch
-        return old_mean_error
+        return mean_score
 
 
 def point_error(predictions, cm_prices) -> np.ndarray:
