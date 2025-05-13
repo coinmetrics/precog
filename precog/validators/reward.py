@@ -81,22 +81,22 @@ def calc_rewards(
             adjusted_point_error = base_point_error / completeness_ratio
             point_errors.append(adjusted_point_error)
 
-        bt.logging.debug(f"\nDebugging interval evaluation for UID {uid}:")
-        bt.logging.debug(f"Number of aligned intervals: {len(inters) if inters is not None else 0}")
-        bt.logging.debug(
-            f"Number of aligned interval prices: {len(interval_prices) if interval_prices is not None else 0}"
-        )
-        bt.logging.debug(f"Interval timestamps: {aligned_int_timestamps[:5] if aligned_int_timestamps else 'None'}...")
+        if uid == 30:
+            bt.logging.debug(f"\nDebugging interval evaluation for UID {uid}:")
+            bt.logging.debug(f"Number of aligned intervals: {len(inters) if inters is not None else 0}")
+            bt.logging.debug(
+                f"Number of aligned interval prices: {len(interval_prices) if interval_prices is not None else 0}"
+            )
 
         if any([np.isnan(inters).any(), np.isnan(interval_prices).any()]):
             interval_errors.append(0)
         else:
-            # Similarly, penalize interval errors for incompleteness
-            base_interval_error = interval_error(inters, interval_prices)
-            adjusted_interval_error = base_interval_error * completeness_ratio  # Lower score for incomplete sets
+            # Pass uid to interval_error function
+            base_interval_error = interval_error(inters, interval_prices, uid=uid)
+            adjusted_interval_error = base_interval_error * completeness_ratio
             interval_errors.append(adjusted_interval_error)
 
-        bt.logging.debug(f"UID: {uid} | point_errors: {point_errors[-1]} | interval_errors: {interval_errors[-1]}")
+        # bt.logging.debug(f"UID: {uid} | point_errors: {point_errors[-1]} | interval_errors: {interval_errors[-1]}")
 
     point_ranks = rank(np.array(point_errors))
     interval_ranks = rank(-np.array(interval_errors))  # 1 is best, 0 is worst, so flip it
@@ -110,31 +110,38 @@ def calc_rewards(
     return rewards
 
 
-def interval_error(intervals, cm_prices):
+def interval_error(intervals, cm_prices, uid=None):  # Add uid parameter
     if intervals is None:
         return np.array([0])
     else:
+        # Only log for UID 30
+        should_log = uid == 30
+
         # Calculate expected intervals based on constants
         intervals_per_hour = 60 / constants.PREDICTION_INTERVAL_MINUTES  # Should be 12
         prediction_window = int(constants.PREDICTION_FUTURE_HOURS * intervals_per_hour)  # Should be 12
 
         # Overall debug info
-        bt.logging.debug("=" * 50)
-        bt.logging.debug("INTERVAL ERROR FUNCTION DEBUG")
-        bt.logging.debug("Constants:")
-        bt.logging.debug(f"  - PREDICTION_INTERVAL_MINUTES: {constants.PREDICTION_INTERVAL_MINUTES}")
-        bt.logging.debug(f"  - PREDICTION_FUTURE_HOURS: {constants.PREDICTION_FUTURE_HOURS}")
-        bt.logging.debug(f"  - Calculated intervals_per_hour: {intervals_per_hour}")
-        bt.logging.debug(f"  - Calculated prediction_window: {prediction_window}")
-        bt.logging.debug("Input data:")
-        bt.logging.debug(f"  - Number of intervals: {len(intervals)}")
-        bt.logging.debug(f"  - Number of prices: {len(cm_prices)}")
-        bt.logging.debug("=" * 50)
+        if should_log:
+            bt.logging.debug("=" * 50)
+            bt.logging.debug(f"INTERVAL ERROR FUNCTION DEBUG FOR UID {uid}")
+            bt.logging.debug("Constants:")
+            bt.logging.debug(f"  - PREDICTION_INTERVAL_MINUTES: {constants.PREDICTION_INTERVAL_MINUTES}")
+            bt.logging.debug(f"  - PREDICTION_FUTURE_HOURS: {constants.PREDICTION_FUTURE_HOURS}")
+            bt.logging.debug(f"  - Calculated intervals_per_hour: {intervals_per_hour}")
+            bt.logging.debug(f"  - Calculated prediction_window: {prediction_window}")
+            bt.logging.debug("Input data:")
+            bt.logging.debug(f"  - Number of intervals: {len(intervals)}")
+            bt.logging.debug(f"  - Number of prices: {len(cm_prices)}")
+            bt.logging.debug("=" * 50)
 
         interval_errors = []
         for i, interval_to_evaluate in enumerate(intervals[:-1]):
-            bt.logging.debug(f"\nProcessing interval {i}:")
-            bt.logging.debug(f"  - Interval bounds: [{np.min(interval_to_evaluate)}, {np.max(interval_to_evaluate)}]")
+            if should_log:
+                bt.logging.debug(f"\nProcessing interval {i}:")
+                bt.logging.debug(
+                    f"  - Interval bounds: [{np.min(interval_to_evaluate)}, {np.max(interval_to_evaluate)}]"
+                )
 
             # Current behavior - evaluating against all future prices
             current_prices_slice = cm_prices[i + 1 :]
@@ -145,72 +152,45 @@ def interval_error(intervals, cm_prices):
             correct_prices_slice = cm_prices[i + 1 : correct_end_index]
             correct_slice_size = len(correct_prices_slice)
 
-            bt.logging.debug(f"  - Current behavior: evaluating against {current_slice_size} future prices")
-            bt.logging.debug(f"  - Correct behavior: should evaluate against {correct_slice_size} future prices")
+            if should_log:
+                bt.logging.debug(f"  - Current behavior: evaluating against {current_slice_size} future prices")
+                bt.logging.debug(f"  - Correct behavior: should evaluate against {correct_slice_size} future prices")
 
-            if current_slice_size > 0 and correct_slice_size > 0:
-                bt.logging.debug(
-                    f"  - Current price range: [{np.min(current_prices_slice):.2f}, {np.max(current_prices_slice):.2f}]"
-                )
-                bt.logging.debug(
-                    f"  - Correct price range: [{np.min(correct_prices_slice):.2f}, {np.max(correct_prices_slice):.2f}]"
-                )
+                if current_slice_size > 0 and correct_slice_size > 0:
+                    bt.logging.debug(
+                        f"  - Current price range: [{np.min(current_prices_slice):.2f}, {np.max(current_prices_slice):.2f}]"
+                    )
+                    bt.logging.debug(
+                        f"  - Correct price range: [{np.min(correct_prices_slice):.2f}, {np.max(correct_prices_slice):.2f}]"
+                    )
 
             # Show the actual calculations
             lower_bound_prediction = np.min(interval_to_evaluate)
             upper_bound_prediction = np.max(interval_to_evaluate)
 
             # Current (potentially buggy) calculation
-            current_effective_min = np.max([lower_bound_prediction, np.min(current_prices_slice)])
-            current_effective_max = np.min([upper_bound_prediction, np.max(current_prices_slice)])
+            effective_min = np.max([lower_bound_prediction, np.min(current_prices_slice)])
+            effective_max = np.min([upper_bound_prediction, np.max(current_prices_slice)])
 
-            # Proposed fix calculation
-            if correct_slice_size > 0:
-                correct_effective_min = np.max([lower_bound_prediction, np.min(correct_prices_slice)])
-                correct_effective_max = np.min([upper_bound_prediction, np.max(correct_prices_slice)])
-            else:
-                correct_effective_min = lower_bound_prediction
-                correct_effective_max = upper_bound_prediction
-
-            bt.logging.debug(f"  - Current effective range: [{current_effective_min:.2f}, {current_effective_max:.2f}]")
-            bt.logging.debug(f"  - Correct effective range: [{correct_effective_min:.2f}, {correct_effective_max:.2f}]")
-
-            # Calculate f_w and f_i for both approaches
-            current_f_w = (current_effective_max - current_effective_min) / (
-                upper_bound_prediction - lower_bound_prediction
-            )
-            current_f_i = sum(
+            # Calculate f_w and f_i
+            f_w = (effective_max - effective_min) / (upper_bound_prediction - lower_bound_prediction)
+            f_i = sum(
                 (current_prices_slice >= lower_bound_prediction) & (current_prices_slice <= upper_bound_prediction)
             ) / len(current_prices_slice)
 
-            if correct_slice_size > 0:
-                correct_f_w = (correct_effective_max - correct_effective_min) / (
-                    upper_bound_prediction - lower_bound_prediction
-                )
-                correct_f_i = sum(
-                    (correct_prices_slice >= lower_bound_prediction) & (correct_prices_slice <= upper_bound_prediction)
-                ) / len(correct_prices_slice)
-            else:
-                correct_f_w = 0
-                correct_f_i = 0
+            if should_log:
+                bt.logging.debug(f"  - f_w: {f_w:.4f}, f_i: {f_i:.4f}, error: {f_w * f_i:.4f}")
 
-            bt.logging.debug(
-                f"  - Current f_w: {current_f_w:.4f}, f_i: {current_f_i:.4f}, error: {current_f_w * current_f_i:.4f}"
-            )
-            bt.logging.debug(
-                f"  - Correct f_w: {correct_f_w:.4f}, f_i: {correct_f_i:.4f}, error: {correct_f_w * correct_f_i:.4f}"
-            )
-
-            # For now, still use the current calculation but log the difference
-            interval_errors.append(current_f_w * current_f_i)
+            interval_errors.append(f_w * f_i)
 
         if len(interval_errors) == 1:
             mean_error = interval_errors[0]
         else:
             mean_error = np.nanmean(np.array(interval_errors)).item()
 
-        bt.logging.debug(f"\nFinal mean error: {mean_error:.4f}")
-        bt.logging.debug("=" * 50)
+        if should_log:
+            bt.logging.debug(f"\nFinal mean error: {mean_error:.4f}")
+            bt.logging.debug("=" * 50)
 
         return mean_error
 
