@@ -81,6 +81,13 @@ def calc_rewards(
             adjusted_point_error = base_point_error / completeness_ratio
             point_errors.append(adjusted_point_error)
 
+        bt.logging.debug(f"\nDebugging interval evaluation for UID {uid}:")
+        bt.logging.debug(f"Number of aligned intervals: {len(inters) if inters is not None else 0}")
+        bt.logging.debug(
+            f"Number of aligned interval prices: {len(interval_prices) if interval_prices is not None else 0}"
+        )
+        bt.logging.debug(f"Interval timestamps: {aligned_int_timestamps[:5] if aligned_int_timestamps else 'None'}...")
+
         if any([np.isnan(inters).any(), np.isnan(interval_prices).any()]):
             interval_errors.append(0)
         else:
@@ -107,23 +114,104 @@ def interval_error(intervals, cm_prices):
     if intervals is None:
         return np.array([0])
     else:
+        # Calculate expected intervals based on constants
+        intervals_per_hour = 60 / constants.PREDICTION_INTERVAL_MINUTES  # Should be 12
+        prediction_window = int(constants.PREDICTION_FUTURE_HOURS * intervals_per_hour)  # Should be 12
+
+        # Overall debug info
+        bt.logging.debug("=" * 50)
+        bt.logging.debug("INTERVAL ERROR FUNCTION DEBUG")
+        bt.logging.debug("Constants:")
+        bt.logging.debug(f"  - PREDICTION_INTERVAL_MINUTES: {constants.PREDICTION_INTERVAL_MINUTES}")
+        bt.logging.debug(f"  - PREDICTION_FUTURE_HOURS: {constants.PREDICTION_FUTURE_HOURS}")
+        bt.logging.debug(f"  - Calculated intervals_per_hour: {intervals_per_hour}")
+        bt.logging.debug(f"  - Calculated prediction_window: {prediction_window}")
+        bt.logging.debug("Input data:")
+        bt.logging.debug(f"  - Number of intervals: {len(intervals)}")
+        bt.logging.debug(f"  - Number of prices: {len(cm_prices)}")
+        bt.logging.debug("=" * 50)
+
         interval_errors = []
         for i, interval_to_evaluate in enumerate(intervals[:-1]):
+            bt.logging.debug(f"\nProcessing interval {i}:")
+            bt.logging.debug(f"  - Interval bounds: [{np.min(interval_to_evaluate)}, {np.max(interval_to_evaluate)}]")
+
+            # Current behavior - evaluating against all future prices
+            current_prices_slice = cm_prices[i + 1 :]
+            current_slice_size = len(current_prices_slice)
+
+            # What it should be - only next prediction_window prices
+            correct_end_index = min(i + 1 + prediction_window, len(cm_prices))
+            correct_prices_slice = cm_prices[i + 1 : correct_end_index]
+            correct_slice_size = len(correct_prices_slice)
+
+            bt.logging.debug(f"  - Current behavior: evaluating against {current_slice_size} future prices")
+            bt.logging.debug(f"  - Correct behavior: should evaluate against {correct_slice_size} future prices")
+
+            if current_slice_size > 0 and correct_slice_size > 0:
+                bt.logging.debug(
+                    f"  - Current price range: [{np.min(current_prices_slice):.2f}, {np.max(current_prices_slice):.2f}]"
+                )
+                bt.logging.debug(
+                    f"  - Correct price range: [{np.min(correct_prices_slice):.2f}, {np.max(correct_prices_slice):.2f}]"
+                )
+
+            # Show the actual calculations
             lower_bound_prediction = np.min(interval_to_evaluate)
             upper_bound_prediction = np.max(interval_to_evaluate)
-            effective_min = np.max([lower_bound_prediction, np.min(cm_prices[i + 1 :])])
-            effective_max = np.min([upper_bound_prediction, np.max(cm_prices[i + 1 :])])
-            f_w = (effective_max - effective_min) / (upper_bound_prediction - lower_bound_prediction)
-            # print(f"f_w: {f_w} | t: {effective_max} | b: {effective_min} | _pmax: {upper_bound_prediction} | _pmin: {lower_bound_prediction}")
-            f_i = sum(
-                (cm_prices[i + 1 :] >= lower_bound_prediction) & (cm_prices[i + 1 :] <= upper_bound_prediction)
-            ) / len(cm_prices[i + 1 :])
-            interval_errors.append(f_w * f_i)
-            # print(f"lower: {lower_bound_prediction} | upper: {upper_bound_prediction} | cm_prices: {cm_prices[i:]} | error: {f_w * f_i}")
+
+            # Current (potentially buggy) calculation
+            current_effective_min = np.max([lower_bound_prediction, np.min(current_prices_slice)])
+            current_effective_max = np.min([upper_bound_prediction, np.max(current_prices_slice)])
+
+            # Proposed fix calculation
+            if correct_slice_size > 0:
+                correct_effective_min = np.max([lower_bound_prediction, np.min(correct_prices_slice)])
+                correct_effective_max = np.min([upper_bound_prediction, np.max(correct_prices_slice)])
+            else:
+                correct_effective_min = lower_bound_prediction
+                correct_effective_max = upper_bound_prediction
+
+            bt.logging.debug(f"  - Current effective range: [{current_effective_min:.2f}, {current_effective_max:.2f}]")
+            bt.logging.debug(f"  - Correct effective range: [{correct_effective_min:.2f}, {correct_effective_max:.2f}]")
+
+            # Calculate f_w and f_i for both approaches
+            current_f_w = (current_effective_max - current_effective_min) / (
+                upper_bound_prediction - lower_bound_prediction
+            )
+            current_f_i = sum(
+                (current_prices_slice >= lower_bound_prediction) & (current_prices_slice <= upper_bound_prediction)
+            ) / len(current_prices_slice)
+
+            if correct_slice_size > 0:
+                correct_f_w = (correct_effective_max - correct_effective_min) / (
+                    upper_bound_prediction - lower_bound_prediction
+                )
+                correct_f_i = sum(
+                    (correct_prices_slice >= lower_bound_prediction) & (correct_prices_slice <= upper_bound_prediction)
+                ) / len(correct_prices_slice)
+            else:
+                correct_f_w = 0
+                correct_f_i = 0
+
+            bt.logging.debug(
+                f"  - Current f_w: {current_f_w:.4f}, f_i: {current_f_i:.4f}, error: {current_f_w * current_f_i:.4f}"
+            )
+            bt.logging.debug(
+                f"  - Correct f_w: {correct_f_w:.4f}, f_i: {correct_f_i:.4f}, error: {correct_f_w * correct_f_i:.4f}"
+            )
+
+            # For now, still use the current calculation but log the difference
+            interval_errors.append(current_f_w * current_f_i)
+
         if len(interval_errors) == 1:
             mean_error = interval_errors[0]
         else:
             mean_error = np.nanmean(np.array(interval_errors)).item()
+
+        bt.logging.debug(f"\nFinal mean error: {mean_error:.4f}")
+        bt.logging.debug("=" * 50)
+
         return mean_error
 
 
