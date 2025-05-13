@@ -91,8 +91,7 @@ def calc_rewards(
         if any([np.isnan(inters).any(), np.isnan(interval_prices).any()]):
             interval_errors.append(0)
         else:
-            # Pass uid to interval_error function
-            base_interval_error = interval_error(inters, interval_prices, uid=uid)
+            base_interval_error = interval_error(inters, interval_prices, uid=uid, timestamps=aligned_int_timestamps)
             adjusted_interval_error = base_interval_error * completeness_ratio
             interval_errors.append(adjusted_interval_error)
 
@@ -110,7 +109,7 @@ def calc_rewards(
     return rewards
 
 
-def interval_error(intervals, cm_prices, uid=None):  # Add uid parameter
+def interval_error(intervals, cm_prices, uid=None, timestamps=None):  # noqa: C901
     if intervals is None:
         return np.array([0])
     else:
@@ -124,7 +123,7 @@ def interval_error(intervals, cm_prices, uid=None):  # Add uid parameter
         # Overall debug info
         if should_log:
             bt.logging.debug("=" * 50)
-            bt.logging.debug(f"INTERVAL ERROR FUNCTION DEBUG FOR UID {uid}")
+            bt.logging.debug(f"INTERVAL ERROR TIMESTAMPS FOR UID {uid}")
             bt.logging.debug("Constants:")
             bt.logging.debug(f"  - PREDICTION_INTERVAL_MINUTES: {constants.PREDICTION_INTERVAL_MINUTES}")
             bt.logging.debug(f"  - PREDICTION_FUTURE_HOURS: {constants.PREDICTION_FUTURE_HOURS}")
@@ -133,6 +132,10 @@ def interval_error(intervals, cm_prices, uid=None):  # Add uid parameter
             bt.logging.debug("Input data:")
             bt.logging.debug(f"  - Number of intervals: {len(intervals)}")
             bt.logging.debug(f"  - Number of prices: {len(cm_prices)}")
+            if timestamps:
+                bt.logging.debug(f"  - Number of timestamps: {len(timestamps)}")
+                bt.logging.debug(f"  - First timestamp: {timestamps[0]}")
+                bt.logging.debug(f"  - Last timestamp: {timestamps[-1]}")
             bt.logging.debug("=" * 50)
 
         interval_errors = []
@@ -142,6 +145,25 @@ def interval_error(intervals, cm_prices, uid=None):  # Add uid parameter
                 bt.logging.debug(
                     f"  - Interval bounds: [{np.min(interval_to_evaluate)}, {np.max(interval_to_evaluate)}]"
                 )
+
+                # Add timestamp information
+                if timestamps and i < len(timestamps):
+                    bt.logging.debug(f"  - Current timestamp: {timestamps[i]}")
+
+                    # Show what we're currently evaluating against
+                    remaining_timestamps = timestamps[i + 1 :]
+                    if remaining_timestamps:
+                        bt.logging.debug(
+                            f"  - Currently evaluating against: {timestamps[i+1]} to {timestamps[-1]} ({len(remaining_timestamps)} timestamps)"
+                        )
+
+                    # Show what we should be evaluating against
+                    correct_end = min(i + 1 + prediction_window, len(timestamps))
+                    correct_timestamps = timestamps[i + 1 : correct_end]
+                    if correct_timestamps:
+                        bt.logging.debug(
+                            f"  - Should evaluate against: {correct_timestamps[0]} to {correct_timestamps[-1]} ({len(correct_timestamps)} timestamps)"
+                        )
 
             # Current behavior - evaluating against all future prices
             current_prices_slice = cm_prices[i + 1 :]
