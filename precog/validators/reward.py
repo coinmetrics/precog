@@ -120,10 +120,9 @@ def interval_error(intervals, cm_prices, uid=None, timestamps=None):  # noqa: C9
         intervals_per_hour = 60 / constants.PREDICTION_INTERVAL_MINUTES  # Should be 12
         prediction_window = int(constants.PREDICTION_FUTURE_HOURS * intervals_per_hour)  # Should be 12
 
-        # Overall debug info
         if should_log:
             bt.logging.debug("=" * 50)
-            bt.logging.debug(f"INTERVAL ERROR TIMESTAMPS FOR UID {uid}")
+            bt.logging.debug(f"INTERVAL ERROR COMPARISON FOR UID {uid}")
             bt.logging.debug("Constants:")
             bt.logging.debug(f"  - PREDICTION_INTERVAL_MINUTES: {constants.PREDICTION_INTERVAL_MINUTES}")
             bt.logging.debug(f"  - PREDICTION_FUTURE_HOURS: {constants.PREDICTION_FUTURE_HOURS}")
@@ -132,89 +131,101 @@ def interval_error(intervals, cm_prices, uid=None, timestamps=None):  # noqa: C9
             bt.logging.debug("Input data:")
             bt.logging.debug(f"  - Number of intervals: {len(intervals)}")
             bt.logging.debug(f"  - Number of prices: {len(cm_prices)}")
-            if timestamps:
-                bt.logging.debug(f"  - Number of timestamps: {len(timestamps)}")
-                bt.logging.debug(f"  - First timestamp: {timestamps[0]}")
-                bt.logging.debug(f"  - Last timestamp: {timestamps[-1]}")
             bt.logging.debug("=" * 50)
 
-        interval_errors = []
+        old_interval_errors = []
+        new_interval_errors = []
+
         for i, interval_to_evaluate in enumerate(intervals[:-1]):
-            if should_log:
-                bt.logging.debug(f"\nProcessing interval {i}:")
-                bt.logging.debug(
-                    f"  - Interval bounds: [{np.min(interval_to_evaluate)}, {np.max(interval_to_evaluate)}]"
-                )
-
-                # Add timestamp information
-                if timestamps and i < len(timestamps):
-                    bt.logging.debug(f"  - Current timestamp: {timestamps[i]}")
-
-                    # Show what we're currently evaluating against
-                    remaining_timestamps = timestamps[i + 1 :]
-                    if remaining_timestamps:
-                        bt.logging.debug(
-                            f"  - Currently evaluating against: {timestamps[i+1]} to {timestamps[-1]} ({len(remaining_timestamps)} timestamps)"
-                        )
-
-                    # Show what we should be evaluating against
-                    correct_end = min(i + 1 + prediction_window, len(timestamps))
-                    correct_timestamps = timestamps[i + 1 : correct_end]
-                    if correct_timestamps:
-                        bt.logging.debug(
-                            f"  - Should evaluate against: {correct_timestamps[0]} to {correct_timestamps[-1]} ({len(correct_timestamps)} timestamps)"
-                        )
-
-            # Current behavior - evaluating against all future prices
-            current_prices_slice = cm_prices[i + 1 :]
-            current_slice_size = len(current_prices_slice)
-
-            # What it should be - only next prediction_window prices
-            correct_end_index = min(i + 1 + prediction_window, len(cm_prices))
-            correct_prices_slice = cm_prices[i + 1 : correct_end_index]
-            correct_slice_size = len(correct_prices_slice)
-
-            if should_log:
-                bt.logging.debug(f"  - Current behavior: evaluating against {current_slice_size} future prices")
-                bt.logging.debug(f"  - Correct behavior: should evaluate against {correct_slice_size} future prices")
-
-                if current_slice_size > 0 and correct_slice_size > 0:
-                    bt.logging.debug(
-                        f"  - Current price range: [{np.min(current_prices_slice):.2f}, {np.max(current_prices_slice):.2f}]"
-                    )
-                    bt.logging.debug(
-                        f"  - Correct price range: [{np.min(correct_prices_slice):.2f}, {np.max(correct_prices_slice):.2f}]"
-                    )
-
-            # Show the actual calculations
             lower_bound_prediction = np.min(interval_to_evaluate)
             upper_bound_prediction = np.max(interval_to_evaluate)
 
-            # Current (potentially buggy) calculation
-            effective_min = np.max([lower_bound_prediction, np.min(current_prices_slice)])
-            effective_max = np.min([upper_bound_prediction, np.max(current_prices_slice)])
+            # OLD METHOD - evaluating against all future prices
+            old_prices_slice = cm_prices[i + 1 :]
+            old_slice_size = len(old_prices_slice)
 
-            # Calculate f_w and f_i
-            f_w = (effective_max - effective_min) / (upper_bound_prediction - lower_bound_prediction)
-            f_i = sum(
-                (current_prices_slice >= lower_bound_prediction) & (current_prices_slice <= upper_bound_prediction)
-            ) / len(current_prices_slice)
+            # NEW METHOD - only next prediction_window prices
+            new_end_index = min(i + 1 + prediction_window, len(cm_prices))
+            new_prices_slice = cm_prices[i + 1 : new_end_index]
+            new_slice_size = len(new_prices_slice)
+
+            # Skip if we don't have enough future data for new method
+            if new_slice_size < prediction_window:
+                if should_log:
+                    bt.logging.debug(f"\nInterval {i}: Skipping - only {new_slice_size} future prices available")
+                # For old method, still calculate if there's any data
+                if old_slice_size > 0:
+                    old_effective_min = np.max([lower_bound_prediction, np.min(old_prices_slice)])
+                    old_effective_max = np.min([upper_bound_prediction, np.max(old_prices_slice)])
+                    old_f_w = (old_effective_max - old_effective_min) / (
+                        upper_bound_prediction - lower_bound_prediction
+                    )
+                    old_f_i = sum(
+                        (old_prices_slice >= lower_bound_prediction) & (old_prices_slice <= upper_bound_prediction)
+                    ) / len(old_prices_slice)
+                    old_interval_errors.append(old_f_w * old_f_i)
+                break
+
+            # Calculate OLD method scores
+            old_effective_min = np.max([lower_bound_prediction, np.min(old_prices_slice)])
+            old_effective_max = np.min([upper_bound_prediction, np.max(old_prices_slice)])
+            old_f_w = (old_effective_max - old_effective_min) / (upper_bound_prediction - lower_bound_prediction)
+            old_f_i = sum(
+                (old_prices_slice >= lower_bound_prediction) & (old_prices_slice <= upper_bound_prediction)
+            ) / len(old_prices_slice)
+            old_score = old_f_w * old_f_i
+            old_interval_errors.append(old_score)
+
+            # Calculate NEW method scores
+            new_effective_min = np.max([lower_bound_prediction, np.min(new_prices_slice)])
+            new_effective_max = np.min([upper_bound_prediction, np.max(new_prices_slice)])
+            new_f_w = (new_effective_max - new_effective_min) / (upper_bound_prediction - lower_bound_prediction)
+            new_f_i = sum(
+                (new_prices_slice >= lower_bound_prediction) & (new_prices_slice <= upper_bound_prediction)
+            ) / len(new_prices_slice)
+            new_score = new_f_w * new_f_i
+            new_interval_errors.append(new_score)
 
             if should_log:
-                bt.logging.debug(f"  - f_w: {f_w:.4f}, f_i: {f_i:.4f}, error: {f_w * f_i:.4f}")
+                bt.logging.debug(f"\nInterval {i}:")
+                if timestamps and i < len(timestamps):
+                    bt.logging.debug(f"  Timestamp: {timestamps[i]}")
+                bt.logging.debug(f"  Interval bounds: [{lower_bound_prediction:.2f}, {upper_bound_prediction:.2f}]")
+                bt.logging.debug("  OLD METHOD:")
+                bt.logging.debug(f"    - Evaluating against {old_slice_size} future prices")
+                bt.logging.debug(f"    - Price range: [{np.min(old_prices_slice):.2f}, {np.max(old_prices_slice):.2f}]")
+                bt.logging.debug(f"    - Effective range: [{old_effective_min:.2f}, {old_effective_max:.2f}]")
+                bt.logging.debug(f"    - f_w: {old_f_w:.4f}, f_i: {old_f_i:.4f}, score: {old_score:.4f}")
+                bt.logging.debug("  NEW METHOD:")
+                bt.logging.debug(f"    - Evaluating against {new_slice_size} future prices")
+                bt.logging.debug(f"    - Price range: [{np.min(new_prices_slice):.2f}, {np.max(new_prices_slice):.2f}]")
+                bt.logging.debug(f"    - Effective range: [{new_effective_min:.2f}, {new_effective_max:.2f}]")
+                bt.logging.debug(f"    - f_w: {new_f_w:.4f}, f_i: {new_f_i:.4f}, score: {new_score:.4f}")
+                bt.logging.debug(
+                    f"  DIFFERENCE: {new_score - old_score:.4f} ({((new_score - old_score) / old_score * 100):.1f}%)"
+                )
 
-            interval_errors.append(f_w * f_i)
-
-        if len(interval_errors) == 1:
-            mean_error = interval_errors[0]
-        else:
-            mean_error = np.nanmean(np.array(interval_errors)).item()
+        # Calculate mean errors
+        old_mean_error = np.nanmean(np.array(old_interval_errors)).item() if old_interval_errors else 0
+        new_mean_error = np.nanmean(np.array(new_interval_errors)).item() if new_interval_errors else 0
 
         if should_log:
-            bt.logging.debug(f"\nFinal mean error: {mean_error:.4f}")
+            bt.logging.debug("\n" + "=" * 50)
+            bt.logging.debug("FINAL COMPARISON:")
+            bt.logging.debug("OLD METHOD:")
+            bt.logging.debug(f"  - Intervals evaluated: {len(old_interval_errors)}")
+            bt.logging.debug(f"  - Mean score: {old_mean_error:.4f}")
+            bt.logging.debug("NEW METHOD:")
+            bt.logging.debug(f"  - Intervals evaluated: {len(new_interval_errors)}")
+            bt.logging.debug(f"  - Mean score: {new_mean_error:.4f}")
+            bt.logging.debug(
+                f"DIFFERENCE: {new_mean_error - old_mean_error:.4f} ({((new_mean_error - old_mean_error) / old_mean_error * 100):.1f}%)"
+            )
             bt.logging.debug("=" * 50)
 
-        return mean_error
+        # Return the OLD method for now (to maintain current behavior)
+        # Change this to new_mean_error when ready to switch
+        return old_mean_error
 
 
 def point_error(predictions, cm_prices) -> np.ndarray:
