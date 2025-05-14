@@ -91,7 +91,7 @@ def calc_rewards(
         if any([np.isnan(inters).any(), np.isnan(interval_prices).any()]):
             interval_scores.append(0)
         else:
-            base_interval_score = interval_score(inters, interval_prices, uid=uid, timestamps=aligned_int_timestamps)
+            base_interval_score = interval_score(inters, interval_prices)
             adjusted_interval_score = base_interval_score * completeness_ratio
             interval_scores.append(adjusted_interval_score)
 
