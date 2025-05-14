@@ -81,13 +81,6 @@ def calc_rewards(
             adjusted_point_error = base_point_error / completeness_ratio
             point_errors.append(adjusted_point_error)
 
-        if uid == 30:
-            bt.logging.debug(f"\nDebugging interval evaluation for UID {uid}:")
-            bt.logging.debug(f"Number of aligned intervals: {len(inters) if inters is not None else 0}")
-            bt.logging.debug(
-                f"Number of aligned interval prices: {len(interval_prices) if interval_prices is not None else 0}"
-            )
-
         if any([np.isnan(inters).any(), np.isnan(interval_prices).any()]):
             interval_scores.append(0)
         else:
