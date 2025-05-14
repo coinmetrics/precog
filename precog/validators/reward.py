@@ -109,33 +109,18 @@ def calc_rewards(
     return rewards
 
 
-def interval_score(intervals, cm_prices, uid=None, timestamps=None):
+def interval_score(intervals, cm_prices):
     if intervals is None:
         return np.array([0])
     else:
-        # Only log for UID 30
-        should_log = uid == 30
-
-        # Calculate expected intervals based on constants
-        intervals_per_hour = 60 / constants.PREDICTION_INTERVAL_MINUTES  # Should be 12
-        prediction_window = int(constants.PREDICTION_FUTURE_HOURS * intervals_per_hour)  # Should be 12
-
-        if should_log:
-            bt.logging.debug("=" * 50)
-            bt.logging.debug(f"INTERVAL ERROR CALCULATION FOR UID {uid}")
-            bt.logging.debug(
-                f"Prediction window: {prediction_window} intervals ({constants.PREDICTION_FUTURE_HOURS} hour)"
-            )
-            bt.logging.debug(f"Total intervals to evaluate: {len(intervals) - 1}")
-            bt.logging.debug("=" * 50)
+        intervals_per_hour = 60 / constants.PREDICTION_INTERVAL_MINUTES
+        prediction_window = int(constants.PREDICTION_FUTURE_HOURS * intervals_per_hour)
 
         interval_scores = []
 
         for i, interval_to_evaluate in enumerate(intervals[:-1]):
             # Check if we have enough future data for a complete prediction window
             if i + 1 + prediction_window > len(cm_prices):
-                if should_log:
-                    bt.logging.debug(f"Interval {i}: Skipping - insufficient future data")
                 break
 
             # Get bounds of the prediction interval
@@ -161,27 +146,10 @@ def interval_score(intervals, cm_prices, uid=None, timestamps=None):
             interval_score = f_w * f_i
             interval_scores.append(interval_score)
 
-            if should_log and i < 5:  # Log first 5 intervals for debugging
-                bt.logging.debug(f"\nInterval {i}:")
-                if timestamps and i < len(timestamps):
-                    bt.logging.debug(f"  Timestamp: {timestamps[i]}")
-                bt.logging.debug(f"  Prediction: [{lower_bound_prediction:.2f}, {upper_bound_prediction:.2f}]")
-                bt.logging.debug(f"  Actual range: [{np.min(future_prices):.2f}, {np.max(future_prices):.2f}]")
-                bt.logging.debug(f"  Effective range: [{effective_min:.2f}, {effective_max:.2f}]")
-                bt.logging.debug(f"  Width factor: {f_w:.4f}")
-                bt.logging.debug(f"  Inclusion factor: {f_i:.4f}")
-                bt.logging.debug(f"  Score: {interval_score:.4f}")
-
-        # Calculate mean score
         if len(interval_scores) == 0:
             mean_score = 0.0
         else:
             mean_score = np.nanmean(np.array(interval_scores)).item()
-
-        if should_log:
-            bt.logging.debug(f"\nFinal mean score: {mean_score:.4f}")
-            bt.logging.debug(f"Intervals evaluated: {len(interval_scores)}")
-            bt.logging.debug("=" * 50)
 
         return mean_score
 
