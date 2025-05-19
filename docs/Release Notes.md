@@ -1,5 +1,10 @@
 Release Notes
 =============
+2.4.2
+-----
+Released on May 19th 2025
+- Ensure that interval predictions are being evaluated against an hour of prices
+
 2.4.1
 -----
 Released on April 30th 2025

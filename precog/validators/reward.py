@@ -24,7 +24,7 @@ def calc_rewards(
 
     # preallocate
     point_errors = []
-    interval_errors = []
+    interval_scores = []
     completeness_scores = []
     decay = 0.9
     timestamp = responses[0].timestamp
@@ -82,17 +82,16 @@ def calc_rewards(
             point_errors.append(adjusted_point_error)
 
         if any([np.isnan(inters).any(), np.isnan(interval_prices).any()]):
-            interval_errors.append(0)
+            interval_scores.append(0)
         else:
-            # Similarly, penalize interval errors for incompleteness
-            base_interval_error = interval_error(inters, interval_prices)
-            adjusted_interval_error = base_interval_error * completeness_ratio  # Lower score for incomplete sets
-            interval_errors.append(adjusted_interval_error)
+            base_interval_score = interval_score(inters, interval_prices)
+            adjusted_interval_score = base_interval_score * completeness_ratio
+            interval_scores.append(adjusted_interval_score)
 
-        bt.logging.debug(f"UID: {uid} | point_errors: {point_errors[-1]} | interval_errors: {interval_errors[-1]}")
+        bt.logging.debug(f"UID: {uid} | point_errors: {point_errors[-1]} | interval_scores: {interval_scores[-1]}")
 
     point_ranks = rank(np.array(point_errors))
-    interval_ranks = rank(-np.array(interval_errors))  # 1 is best, 0 is worst, so flip it
+    interval_ranks = rank(-np.array(interval_scores))  # 1 is best, 0 is worst, so flip it
 
     point_weights = get_average_weights_for_ties(point_ranks, decay)
     interval_weights = get_average_weights_for_ties(interval_ranks, decay)
@@ -103,28 +102,49 @@ def calc_rewards(
     return rewards
 
 
-def interval_error(intervals, cm_prices):
+def interval_score(intervals, cm_prices):
     if intervals is None:
         return np.array([0])
     else:
-        interval_errors = []
+        intervals_per_hour = 60 / constants.PREDICTION_INTERVAL_MINUTES
+        prediction_window = int(constants.PREDICTION_FUTURE_HOURS * intervals_per_hour)
+
+        interval_scores = []
+
         for i, interval_to_evaluate in enumerate(intervals[:-1]):
+            # Check if we have enough future data for a complete prediction window
+            if i + 1 + prediction_window > len(cm_prices):
+                break
+
+            # Get bounds of the prediction interval
             lower_bound_prediction = np.min(interval_to_evaluate)
             upper_bound_prediction = np.max(interval_to_evaluate)
-            effective_min = np.max([lower_bound_prediction, np.min(cm_prices[i + 1 :])])
-            effective_max = np.min([upper_bound_prediction, np.max(cm_prices[i + 1 :])])
+
+            # Get only the next hour of prices (the prediction window)
+            future_prices = cm_prices[i + 1 : i + 1 + prediction_window]
+
+            # Calculate effective bounds (overlap between prediction and actual)
+            effective_min = np.max([lower_bound_prediction, np.min(future_prices)])
+            effective_max = np.min([upper_bound_prediction, np.max(future_prices)])
+
+            # Calculate width factor (f_w): how much of the prediction was "used"
             f_w = (effective_max - effective_min) / (upper_bound_prediction - lower_bound_prediction)
-            # print(f"f_w: {f_w} | t: {effective_max} | b: {effective_min} | _pmax: {upper_bound_prediction} | _pmin: {lower_bound_prediction}")
-            f_i = sum(
-                (cm_prices[i + 1 :] >= lower_bound_prediction) & (cm_prices[i + 1 :] <= upper_bound_prediction)
-            ) / len(cm_prices[i + 1 :])
-            interval_errors.append(f_w * f_i)
-            # print(f"lower: {lower_bound_prediction} | upper: {upper_bound_prediction} | cm_prices: {cm_prices[i:]} | error: {f_w * f_i}")
-        if len(interval_errors) == 1:
-            mean_error = interval_errors[0]
+
+            # Calculate inclusion factor (f_i): what % of prices fell within prediction
+            f_i = sum((future_prices >= lower_bound_prediction) & (future_prices <= upper_bound_prediction)) / len(
+                future_prices
+            )
+
+            # Final score for this interval
+            interval_score = f_w * f_i
+            interval_scores.append(interval_score)
+
+        if len(interval_scores) == 0:
+            mean_score = 0.0
         else:
-            mean_error = np.nanmean(np.array(interval_errors)).item()
-        return mean_error
+            mean_score = np.nanmean(np.array(interval_scores)).item()
+
+        return mean_score
 
 
 def point_error(predictions, cm_prices) -> np.ndarray:
