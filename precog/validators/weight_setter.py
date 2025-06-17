@@ -61,6 +61,8 @@ class weight_setter:
         if not self.config.wandb.off:
             setup_wandb(self)
         self.stop_event = asyncio.Event()
+        # Initialize timestamp to current time to prevent immediate query on startup
+        self.timestamp = to_str(round_to_interval(get_now(), interval_minutes=5))
         bt.logging.info("Setup complete, starting loop")
         self.loop.create_task(
             loop_handler(self, self.scheduled_prediction_request, sleep_time=self.config.print_cadence)
