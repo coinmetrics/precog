@@ -31,15 +31,23 @@ def calc_rewards(
     eval_time = to_datetime(timestamp)
     prediction_time = get_before(timestamp=timestamp, hours=prediction_future_hours)
 
+    bt.logging.info(f"Timestamp from response: {timestamp}")
+    bt.logging.info(f"Eval time (converted): {eval_time}")
+    bt.logging.info(f"Prediction time (eval_time - {prediction_future_hours}h): {prediction_time}")
+    bt.logging.info(f"prediction_future_hours constant: {prediction_future_hours}")
+
     # Get price data for evaluation time and the following hour (for interval evaluation)
     start_time: str = to_str(eval_time)
     end_time: str = to_str(eval_time + timedelta(hours=1))
+
+    bt.logging.info(f"Fetching CM data from {start_time} to {end_time} for interval evaluation")
 
     # Query CM API for price data
     historical_price_data: DataFrame = cm.get_CM_ReferenceRate(
         assets="BTC", start=start_time, end=end_time, frequency="1s"
     )
     cm_data = pd_to_dict(historical_price_data)
+    bt.logging.info(f"CM data fetched: {len(cm_data)} price points")
 
     for uid, response in zip(self.available_uids, responses):
         current_miner = self.MinerHistory[uid]
@@ -85,22 +93,31 @@ def calc_rewards(
                 bt.logging.debug(f"UID: {uid} | No price data for interval evaluation")
             else:
                 # Calculate interval score using both width factor and inclusion factor
+                bt.logging.debug(f"UID: {uid} | Raw interval_bounds: {interval_bounds}")
+                bt.logging.debug(f"UID: {uid} | Number of hour_prices: {len(hour_prices)}")
                 pred_min = min(interval_bounds)
                 pred_max = max(interval_bounds)
 
                 # Get observed min and max prices
                 observed_min = min(hour_prices)
                 observed_max = max(hour_prices)
+                bt.logging.debug(
+                    f"UID: {uid} | Predicted: [{pred_min}, {pred_max}], Observed: [{observed_min}, {observed_max}]"
+                )
 
                 # Calculate effective top and bottom
                 effective_top = min(pred_max, observed_max)
                 effective_bottom = max(pred_min, observed_min)
+                bt.logging.debug(f"UID: {uid} | Effective top: {effective_top}, Effective bottom: {effective_bottom}")
 
                 # Calculate width factor (f_w)
                 if pred_max == pred_min:
                     width_factor = 0  # Invalid interval
                 else:
                     width_factor = (effective_top - effective_bottom) / (pred_max - pred_min)
+                    bt.logging.debug(
+                        f"UID: {uid} | Width calculation: ({effective_top} - {effective_bottom}) / ({pred_max} - {pred_min}) = {width_factor}"
+                    )
 
                 # Calculate inclusion factor (f_i)
                 prices_in_bounds = sum(1 for price in hour_prices if pred_min <= price <= pred_max)
