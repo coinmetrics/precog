@@ -35,7 +35,7 @@ def log_wandb(responses, rewards, miner_uids, hotkeys, moving_average_scores):
                     "miner_point_prediction": response.prediction,
                     "miner_interval_prediction": response.interval,
                     "miner_reward": reward,
-                    "miner_moving_average": moving_average_scores.get(miner_uid, 0),
+                    "miner_moving_average": float(moving_average_scores.get(miner_uid, 0)),
                 }
                 for miner_uid, response, reward in zip(miner_uids, responses, rewards.tolist())
             },

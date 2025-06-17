@@ -84,14 +84,36 @@ def calc_rewards(
                 interval_scores.append(0)  # No price data for interval evaluation
                 bt.logging.debug(f"UID: {uid} | No price data for interval evaluation")
             else:
-                # Calculate interval score: fraction of prices within predicted bounds
-                lower_bound = min(interval_bounds)
-                upper_bound = max(interval_bounds)
-                prices_in_bounds = sum(1 for price in hour_prices if lower_bound <= price <= upper_bound)
-                interval_score_value = prices_in_bounds / len(hour_prices)
+                # Calculate interval score using both width factor and inclusion factor
+                pred_min = min(interval_bounds)
+                pred_max = max(interval_bounds)
+
+                # Get observed min and max prices
+                observed_min = min(hour_prices)
+                observed_max = max(hour_prices)
+
+                # Calculate effective top and bottom
+                effective_top = min(pred_max, observed_max)
+                effective_bottom = max(pred_min, observed_min)
+
+                # Calculate width factor (f_w)
+                if pred_max == pred_min:
+                    width_factor = 0  # Invalid interval
+                else:
+                    width_factor = (effective_top - effective_bottom) / (pred_max - pred_min)
+
+                # Calculate inclusion factor (f_i)
+                prices_in_bounds = sum(1 for price in hour_prices if pred_min <= price <= pred_max)
+                inclusion_factor = prices_in_bounds / len(hour_prices)
+
+                # Final interval score is the product
+                interval_score_value = inclusion_factor * width_factor
                 interval_scores.append(interval_score_value)
+
                 bt.logging.debug(
-                    f"UID: {uid} | Interval: [{lower_bound}, {upper_bound}] | Score: {interval_score_value}"
+                    f"UID: {uid} | Interval: [{pred_min}, {pred_max}] | "
+                    f"Width Factor: {width_factor:.3f} | Inclusion Factor: {inclusion_factor:.3f} | "
+                    f"Score: {interval_score_value:.3f}"
                 )
 
         bt.logging.debug(f"UID: {uid} | point_errors: {point_errors[-1]} | interval_scores: {interval_scores[-1]}")
