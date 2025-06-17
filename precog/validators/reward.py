@@ -1,4 +1,3 @@
-from datetime import timedelta
 from typing import List
 
 import bittensor as bt
@@ -29,16 +28,17 @@ def calc_rewards(
 
     # Current evaluation time and when prediction was made
     eval_time = to_datetime(timestamp)
-    prediction_time = get_before(timestamp=timestamp, hours=prediction_future_hours)
+    prediction_time = get_before(timestamp=timestamp, hours=prediction_future_hours, minutes=0)
 
     bt.logging.info(f"Timestamp from response: {timestamp}")
     bt.logging.info(f"Eval time (converted): {eval_time}")
     bt.logging.info(f"Prediction time (eval_time - {prediction_future_hours}h): {prediction_time}")
     bt.logging.info(f"prediction_future_hours constant: {prediction_future_hours}")
 
-    # Get price data for evaluation time and the following hour (for interval evaluation)
-    start_time: str = to_str(eval_time)
-    end_time: str = to_str(eval_time + timedelta(hours=1))
+    # Get price data for the past hour (the hour that was predicted)
+    # Miners predicted at prediction_time for the period [prediction_time, eval_time]
+    start_time: str = to_str(prediction_time)
+    end_time: str = to_str(eval_time)
 
     bt.logging.info(f"Fetching CM data from {start_time} to {end_time} for interval evaluation")
 
@@ -79,13 +79,12 @@ def calc_rewards(
         else:
             interval_bounds = current_miner.intervals[prediction_time]
 
-            # Evaluate interval over the next hour of price data (from eval_time)
+            # Evaluate interval over the past hour (from prediction_time to eval_time)
             hour_prices = []
-            end_eval_time = eval_time + timedelta(hours=1)
 
-            # Collect all price points in the next hour
+            # Collect all price points in the predicted hour
             for price_time, price_value in cm_data.items():
-                if eval_time <= price_time < end_eval_time:
+                if prediction_time <= price_time <= eval_time:
                     hour_prices.append(price_value)
 
             if not hour_prices:
