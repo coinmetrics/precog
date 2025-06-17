@@ -257,7 +257,7 @@ class weight_setter:
                         ) * self.moving_average_scores[i] + self.config.neuron.moving_average_alpha * value
                         self.scores = list(self.moving_average_scores.values())
                     if not self.config.wandb.off:
-                        log_wandb(responses, rewards, self.available_uids, self.hotkeys)
+                        log_wandb(responses, rewards, self.available_uids, self.hotkeys, self.moving_average_scores)
                 except Exception as e:
                     import traceback
 
