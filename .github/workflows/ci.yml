@@ -36,19 +36,7 @@ jobs:
     uses: ./.github/workflows/build.yml
     with:
       name: Isort
-      command: |
-        echo "=== Checking each file individually ==="
-        EXIT_CODE=0
-        for file in $(poetry run python -m isort --show-files .); do
-          echo "Checking $file..."
-          if ! poetry run python -m isort --check-only --diff "$file"; then
-            echo "❌ FAILED: $file"
-            EXIT_CODE=1
-          else
-            echo "✅ PASSED: $file"
-          fi
-        done
-        exit $EXIT_CODE
+      command: poetry run python -m isort --check-only .
   lint-mypy:
     name: Linter
     needs: build
