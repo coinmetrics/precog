@@ -26,7 +26,7 @@ def setup_wandb(self) -> None:
         bt.logging.error("WANDB_API_KEY not found in environment variables.")
 
 
-def log_wandb(responses, rewards, miner_uids, hotkeys):
+def log_wandb(responses, rewards, miner_uids, hotkeys, moving_average_scores):
     try:
         wandb_val_log = {
             "miners_info": {
@@ -35,6 +35,7 @@ def log_wandb(responses, rewards, miner_uids, hotkeys):
                     "miner_point_prediction": response.prediction,
                     "miner_interval_prediction": response.interval,
                     "miner_reward": reward,
+                    "miner_moving_average": float(moving_average_scores.get(miner_uid, 0)),
                 }
                 for miner_uid, response, reward in zip(miner_uids, responses, rewards.tolist())
             },

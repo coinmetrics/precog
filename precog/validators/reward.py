@@ -8,7 +8,7 @@ from precog import constants
 from precog.protocol import Challenge
 from precog.utils.cm_data import CMData
 from precog.utils.general import get_average_weights_for_ties, pd_to_dict, rank
-from precog.utils.timestamp import align_timepoints, get_before, mature_dictionary, to_datetime, to_str
+from precog.utils.timestamp import get_before, to_datetime, to_str
 
 
 ################################################################################
@@ -16,77 +16,121 @@ def calc_rewards(
     self,
     responses: List[Challenge],
 ) -> np.ndarray:
-    evaluation_window_hours = constants.EVALUATION_WINDOW_HOURS
     prediction_future_hours = constants.PREDICTION_FUTURE_HOURS
-    prediction_interval_minutes = constants.PREDICTION_INTERVAL_MINUTES
-
-    expected_timepoints = evaluation_window_hours * 60 / prediction_interval_minutes
 
     # preallocate
     point_errors = []
     interval_scores = []
-    completeness_scores = []
     decay = 0.9
     timestamp = responses[0].timestamp
     bt.logging.debug(f"Calculating rewards for timestamp: {timestamp}")
     cm = CMData()
-    # Adjust time window to look at predictions that have had time to mature
-    # Start: (evaluation_window + prediction) hours ago
-    # End: prediction_future_hours ago (to ensure all predictions have matured)
-    start_time: str = to_str(get_before(timestamp=timestamp, hours=evaluation_window_hours + prediction_future_hours))
-    end_time: str = to_str(to_datetime(get_before(timestamp=timestamp, hours=prediction_future_hours)))
-    # Query CM API for sample standard deviation of the 1s residuals
+
+    # Current evaluation time and when prediction was made
+    eval_time = to_datetime(timestamp)
+    prediction_time = get_before(timestamp=timestamp, hours=prediction_future_hours, minutes=0)
+
+    bt.logging.info(f"Timestamp from response: {timestamp}")
+    bt.logging.info(f"Eval time (converted): {eval_time}")
+    bt.logging.info(f"Prediction time (eval_time - {prediction_future_hours}h): {prediction_time}")
+    bt.logging.info(f"prediction_future_hours constant: {prediction_future_hours}")
+
+    # Get price data for the past hour (the hour that was predicted)
+    # Miners predicted at prediction_time for the period [prediction_time, eval_time]
+    start_time: str = to_str(prediction_time)
+    end_time: str = to_str(eval_time)
+
+    bt.logging.info(f"Fetching CM data from {start_time} to {end_time} for interval evaluation")
+
+    # Query CM API for price data
     historical_price_data: DataFrame = cm.get_CM_ReferenceRate(
         assets="BTC", start=start_time, end=end_time, frequency="1s"
     )
     cm_data = pd_to_dict(historical_price_data)
+    bt.logging.info(f"CM data fetched: {len(cm_data)} price points")
 
     for uid, response in zip(self.available_uids, responses):
         current_miner = self.MinerHistory[uid]
         self.MinerHistory[uid].add_prediction(response.timestamp, response.prediction, response.interval)
-        # Get predictions from the evaluation window that have had time to mature
-        prediction_dict, interval_dict = current_miner.format_predictions(
-            reference_timestamp=get_before(timestamp, hours=prediction_future_hours),
-            hours=evaluation_window_hours,
-        )
 
-        # Mature the predictions (shift forward by 1 hour)
-        mature_time_dict = mature_dictionary(prediction_dict, hours=prediction_future_hours)
-
-        preds, price, aligned_pred_timestamps = align_timepoints(mature_time_dict, cm_data)
-
-        num_predictions = len(preds) if preds is not None else 0
-
-        # Ensure a maximum ratio of 1.0
-        completeness_ratio = min(num_predictions / expected_timepoints, 1.0)
-        completeness_scores.append(completeness_ratio)
-        bt.logging.debug(
-            f"UID: {uid} | Completeness: {completeness_ratio:.2f} ({num_predictions}/{expected_timepoints})"
-        )
-
-        # for i, j, k in zip(preds, price, aligned_pred_timestamps):
-        #     bt.logging.debug(f"Prediction: {i} | Price: {j} | Aligned Prediction: {k}")
-        inters, interval_prices, aligned_int_timestamps = align_timepoints(interval_dict, cm_data)
-        # for i, j, k in zip(inters, interval_prices, aligned_int_timestamps):
-        #     bt.logging.debug(f"Interval: {i} | Interval Price: {j} | Aligned TS: {k}")
-
-        # Penalize miners with missing predictions by increasing their point error
-        if preds is None or len(preds) == 0:
-            point_errors.append(np.inf)  # Maximum penalty for no predictions
+        # Get single prediction made at prediction_time (1 hour ago)
+        if prediction_time not in current_miner.predictions:
+            point_errors.append(np.inf)  # No prediction penalty
+            bt.logging.debug(f"UID: {uid} | No prediction found at {prediction_time}")
         else:
-            # Calculate error as normal, but apply completeness penalty
-            base_point_error = point_error(preds, price)
-            # Apply penalty inversely proportional to completeness
-            # This will increase error for incomplete prediction sets
-            adjusted_point_error = base_point_error / completeness_ratio
-            point_errors.append(adjusted_point_error)
+            prediction_value = current_miner.predictions[prediction_time]
 
-        if any([np.isnan(inters).any(), np.isnan(interval_prices).any()]):
-            interval_scores.append(0)
+            # Get actual price at eval_time
+            if eval_time not in cm_data:
+                point_errors.append(np.inf)  # No price data penalty
+                bt.logging.debug(f"UID: {uid} | No price data at {eval_time}")
+            else:
+                actual_price = cm_data[eval_time]
+                current_point_error = abs(prediction_value - actual_price) / actual_price
+                point_errors.append(current_point_error)
+                bt.logging.debug(
+                    f"UID: {uid} | Prediction: {prediction_value} | Actual: {actual_price} | Error: {current_point_error}"
+                )
+
+        # Get single interval prediction made at prediction_time
+        if prediction_time not in current_miner.intervals:
+            interval_scores.append(0)  # No interval prediction
+            bt.logging.debug(f"UID: {uid} | No interval prediction found at {prediction_time}")
         else:
-            base_interval_score = interval_score(inters, interval_prices)
-            adjusted_interval_score = base_interval_score * completeness_ratio
-            interval_scores.append(adjusted_interval_score)
+            interval_bounds = current_miner.intervals[prediction_time]
+
+            # Evaluate interval over the past hour (from prediction_time to eval_time)
+            hour_prices = []
+
+            # Collect all price points in the predicted hour
+            for price_time, price_value in cm_data.items():
+                if prediction_time <= price_time <= eval_time:
+                    hour_prices.append(price_value)
+
+            if not hour_prices:
+                interval_scores.append(0)  # No price data for interval evaluation
+                bt.logging.debug(f"UID: {uid} | No price data for interval evaluation")
+            else:
+                # Calculate interval score using both width factor and inclusion factor
+                bt.logging.debug(f"UID: {uid} | Raw interval_bounds: {interval_bounds}")
+                bt.logging.debug(f"UID: {uid} | Number of hour_prices: {len(hour_prices)}")
+                pred_min = min(interval_bounds)
+                pred_max = max(interval_bounds)
+
+                # Get observed min and max prices
+                observed_min = min(hour_prices)
+                observed_max = max(hour_prices)
+                bt.logging.debug(
+                    f"UID: {uid} | Predicted: [{pred_min}, {pred_max}], Observed: [{observed_min}, {observed_max}]"
+                )
+
+                # Calculate effective top and bottom
+                effective_top = min(pred_max, observed_max)
+                effective_bottom = max(pred_min, observed_min)
+                bt.logging.debug(f"UID: {uid} | Effective top: {effective_top}, Effective bottom: {effective_bottom}")
+
+                # Calculate width factor (f_w)
+                if pred_max == pred_min:
+                    width_factor = 0  # Invalid interval
+                else:
+                    width_factor = (effective_top - effective_bottom) / (pred_max - pred_min)
+                    bt.logging.debug(
+                        f"UID: {uid} | Width calculation: ({effective_top} - {effective_bottom}) / ({pred_max} - {pred_min}) = {width_factor}"
+                    )
+
+                # Calculate inclusion factor (f_i)
+                prices_in_bounds = sum(1 for price in hour_prices if pred_min <= price <= pred_max)
+                inclusion_factor = prices_in_bounds / len(hour_prices)
+
+                # Final interval score is the product
+                interval_score_value = inclusion_factor * width_factor
+                interval_scores.append(interval_score_value)
+
+                bt.logging.debug(
+                    f"UID: {uid} | Interval: [{pred_min}, {pred_max}] | "
+                    f"Width Factor: {width_factor:.3f} | Inclusion Factor: {inclusion_factor:.3f} | "
+                    f"Score: {interval_score_value:.3f}"
+                )
 
         bt.logging.debug(f"UID: {uid} | point_errors: {point_errors[-1]} | interval_scores: {interval_scores[-1]}")
 
@@ -103,56 +147,3 @@ def calc_rewards(
     rewards = base_rewards * np.array(completeness_scores)
 
     return rewards
-
-
-def interval_score(intervals, cm_prices):
-    if intervals is None:
-        return np.array([0])
-    else:
-        intervals_per_hour = 60 / constants.PREDICTION_INTERVAL_MINUTES
-        prediction_window = int(constants.PREDICTION_FUTURE_HOURS * intervals_per_hour)
-
-        interval_scores = []
-
-        for i, interval_to_evaluate in enumerate(intervals[:-1]):
-            # Check if we have enough future data for a complete prediction window
-            if i + 1 + prediction_window > len(cm_prices):
-                break
-
-            # Get bounds of the prediction interval
-            lower_bound_prediction = np.min(interval_to_evaluate)
-            upper_bound_prediction = np.max(interval_to_evaluate)
-
-            # Get only the next hour of prices (the prediction window)
-            future_prices = cm_prices[i + 1 : i + 1 + prediction_window]
-
-            # Calculate effective bounds (overlap between prediction and actual)
-            effective_min = np.max([lower_bound_prediction, np.min(future_prices)])
-            effective_max = np.min([upper_bound_prediction, np.max(future_prices)])
-
-            # Calculate width factor (f_w): how much of the prediction was "used"
-            f_w = (effective_max - effective_min) / (upper_bound_prediction - lower_bound_prediction)
-
-            # Calculate inclusion factor (f_i): what % of prices fell within prediction
-            f_i = sum((future_prices >= lower_bound_prediction) & (future_prices <= upper_bound_prediction)) / len(
-                future_prices
-            )
-
-            # Final score for this interval
-            interval_score = f_w * f_i
-            interval_scores.append(interval_score)
-
-        if len(interval_scores) == 0:
-            mean_score = 0.0
-        else:
-            mean_score = np.nanmean(np.array(interval_scores)).item()
-
-        return mean_score
-
-
-def point_error(predictions, cm_prices) -> np.ndarray:
-    if predictions is None:
-        point_error = np.inf
-    else:
-        point_error = np.mean(np.abs(np.array(predictions) - np.array(cm_prices)) / np.array(cm_prices))
-    return point_error.item()
