@@ -143,5 +143,6 @@ def calc_rewards(
     bt.logging.trace(f"interval_weights: {point_weights}")
 
     rewards = (point_weights + interval_weights) / 2
+    bt.logging.trace(f"base_rewards: {rewards}")
 
     return rewards
