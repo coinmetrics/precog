@@ -142,8 +142,7 @@ def calc_rewards(
     bt.logging.trace(f"point_weights: {point_weights}")
     bt.logging.trace(f"interval_weights: {point_weights}")
 
-    base_rewards = (point_weights + interval_weights) / 2
-    bt.logging.trace(f"base_rewards: {base_rewards}")
-    rewards = base_rewards * np.array(completeness_scores)
+    rewards = (point_weights + interval_weights) / 2
+    bt.logging.trace(f"base_rewards: {rewards}")
 
     return rewards
