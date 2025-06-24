@@ -61,6 +61,8 @@ class weight_setter:
         if not self.config.wandb.off:
             setup_wandb(self)
         self.stop_event = asyncio.Event()
+        # Initialize timestamp to current time to prevent immediate query on startup
+        self.timestamp = to_str(round_to_interval(get_now(), interval_minutes=5))
         bt.logging.info("Setup complete, starting loop")
         self.loop.create_task(
             loop_handler(self, self.scheduled_prediction_request, sleep_time=self.config.print_cadence)
@@ -257,7 +259,7 @@ class weight_setter:
                         ) * self.moving_average_scores[i] + self.config.neuron.moving_average_alpha * value
                         self.scores = list(self.moving_average_scores.values())
                     if not self.config.wandb.off:
-                        log_wandb(responses, rewards, self.available_uids, self.hotkeys)
+                        log_wandb(responses, rewards, self.available_uids, self.hotkeys, self.moving_average_scores)
                 except Exception as e:
                     import traceback
 
