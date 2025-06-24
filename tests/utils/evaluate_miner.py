@@ -242,21 +242,30 @@ def add_ema_score(
         shares_df["point_share"] + shares_df["interval_share"]
     ) / 2
 
-    def ewm_fixed_window(series, window, alpha):
-        coeff = (1 - alpha) ** np.arange(window)[::-1]
-        idx = range(series.index[0], series.index[0] + window)
-        series_align = series.reindex(idx, fill_value=0)
-        return (coeff * series_align).sum() / coeff.sum()
-
+    # # For fixed-size window 
+    # def ewm_fixed_window(series, window, alpha):
+    #     coeff = (1 - alpha) ** np.arange(window)[::-1]
+    #     idx = range(series.index[0], series.index[0] + window)
+    #     series_align = series.reindex(idx, fill_value=0)
+    #     return (coeff * series_align).sum() / coeff.sum()
+    
+    # shares_df["share_ema"] = (
+    #     shares_df.groupby("miner_hotkey")["total_share"]
+    #     .apply(
+    #         lambda x: x.rolling(window=n_window, min_periods=1).apply(
+    #             lambda s: ewm_fixed_window(s, window=n_window, alpha=alpha)
+    #         )
+    #     )
+    #     .reset_index(level=0, drop=True)
+    # )
+    
     shares_df["share_ema"] = (
-        shares_df.groupby("miner_hotkey")["total_share"]
-        .apply(
-            lambda x: x.rolling(window=n_window, min_periods=1).apply(
-                lambda s: ewm_fixed_window(s, window=n_window, alpha=alpha)
-            )
-        )
+        shares_df.groupby("miner_hotkey")["total_share"].ewm(
+            alpha=alpha, adjust=False, min_periods=1
+        ).mean()
         .reset_index(level=0, drop=True)
     )
+    
     return shares_df
 
 
