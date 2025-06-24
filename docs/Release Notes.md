@@ -1,5 +1,13 @@
 Release Notes
 =============
+2.5.0
+-----
+Released on June 25th 2025
+- Streamline rewards calculation
+    - Weights are now calculated solely from the moving average of rewards
+- Improvements to validation logic
+    - Ensure that requests are not sent to miners immediately on validator restart
+
 2.4.2
 -----
 Released on May 19th 2025
