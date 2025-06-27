@@ -1,5 +1,10 @@
 Release Notes
 =============
+2.5.1
+-----
+Released on June 27th 2025
+- Increase moving average alpha parameter to have a half life of 2 hours
+
 2.5.0
 -----
 Released on June 25th 2025

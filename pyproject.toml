@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "precog"
-version = "2.5.0"
+version = "2.5.1"
 description = "Bitcoin Price Prediction Subnet"
 authors = ["Coin Metrics", "Yuma Group"]
 readme = "README.md"
