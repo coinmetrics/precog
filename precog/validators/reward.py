@@ -21,7 +21,7 @@ def calc_rewards(
     # preallocate
     point_errors = []
     interval_scores = []
-    decay = 0.9
+    decay = 0.8
     timestamp = responses[0].timestamp
     bt.logging.debug(f"Calculating rewards for timestamp: {timestamp}")
     cm = CMData()

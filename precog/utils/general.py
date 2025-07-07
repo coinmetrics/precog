@@ -49,7 +49,7 @@ def rank(vector):
         return rank_vector
 
 
-def get_average_weights_for_ties(ranks, decay=0.9):
+def get_average_weights_for_ties(ranks, decay):
     """
     Corrected implementation that properly averages weights for tied positions.
     """

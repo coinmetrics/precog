@@ -1,5 +1,11 @@
 Release Notes
 =============
+2.5.2
+-----
+Released on July 8th 2025
+- Decrease ranking decay to 0.8
+- Increase moving average alpha to 0.1
+
 2.5.1
 -----
 Released on June 27th 2025
