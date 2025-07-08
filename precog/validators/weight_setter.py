@@ -209,7 +209,8 @@ class weight_setter:
             for i, j in zip(weights, self.available_uids):
                 bt.logging.debug(f"UID: {j}  |  Weight: {i}")
             if sum(weights) == 0:
-                weights = [1] * len(weights)
+                bt.logging.warning("All weights are 0, skipping weight setting until scores are available")
+                return
             # Convert to uint16 weights and uids.
             (
                 uint_uids,
