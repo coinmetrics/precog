@@ -1,5 +1,10 @@
 Release Notes
 =============
+2.5.3
+-----
+Released on July 10th 2025
+- Decrease moving average alpha to 0.05
+
 2.5.2
 -----
 Released on July 8th 2025
