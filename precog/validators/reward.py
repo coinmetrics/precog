@@ -86,7 +86,6 @@ def _process_asset_predictions(
                 bt.logging.debug(f"UID: {uid} | {asset} | No price data for interval evaluation")
 
 
-################################################################################
 def calc_rewards(
     self,
     responses: List[Challenge],
