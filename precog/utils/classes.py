@@ -1,5 +1,5 @@
 from datetime import timedelta
-from typing import List
+from typing import Dict, List
 
 from precog.utils.timestamp import get_now, get_timezone, round_minute_down, to_datetime
 
@@ -7,22 +7,24 @@ from precog.utils.timestamp import get_now, get_timezone, round_minute_down, to_
 class MinerHistory:
     """This class is used to store miner predictions along with their timestamps.
     Allows for easy formatting, filtering, and lookup of predictions by timestamp.
+    Now supports multiple assets per timestamp.
     """
 
     def __init__(self, uid: int, timezone=get_timezone()):
-        self.predictions = {}
-        self.intervals = {}
+        self.predictions = {}  # {timestamp: {asset: prediction}}
+        self.intervals = {}  # {timestamp: {asset: interval}}
         self.uid = uid
         self.timezone = timezone
 
-    def add_prediction(self, timestamp, prediction: float, interval: List[float]):
+    def add_prediction(self, timestamp, predictions: Dict[str, float], intervals: Dict[str, List[float]]):
         if isinstance(timestamp, str):
             timestamp = to_datetime(timestamp)
         timestamp = round_minute_down(timestamp)
-        if prediction is not None:
-            self.predictions[timestamp] = prediction
-        if interval is not None:
-            self.intervals[timestamp] = interval
+
+        if predictions:
+            self.predictions[timestamp] = predictions.copy()
+        if intervals:
+            self.intervals[timestamp] = intervals.copy()
 
     def clear_old_predictions(self):
         # deletes predictions older than 24 hours

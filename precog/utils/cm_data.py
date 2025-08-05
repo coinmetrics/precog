@@ -105,20 +105,50 @@ class CMData:
                 **kwargs,
             )
 
-            self._cache = pd.concat([self._cache, new_data]).drop_duplicates(subset=["time"])
-            self._cache.sort_values("time", inplace=True)
+            self._cache = pd.concat([self._cache, new_data]).drop_duplicates(subset=["time", "asset"])
+            self._cache.sort_values(["time", "asset"], inplace=True)
             self._last_update = end_time
 
         # Remove data older than 24 hours from latest point
         cutoff_time = end_time - pd.Timedelta(days=1)
-        self._cache = self._cache[self._cache["time"] >= cutoff_time].reset_index(drop=True)
 
-        # Filter data for requested time range
+        # Also limit to only currently supported assets to prevent unbounded growth
+        from precog import constants
+
+        supported_assets = constants.SUPPORTED_ASSETS
+
+        self._cache = self._cache[
+            (self._cache["time"] >= cutoff_time) & (self._cache["asset"].isin(supported_assets))
+        ].reset_index(drop=True)
+
+        # Enforce hard size limits to prevent memory leaks
+        if len(self._cache) > constants.MAX_CACHE_ROWS:
+            bt.logging.warning(f"Cache exceeded {constants.MAX_CACHE_ROWS} rows, keeping most recent data")
+            self._cache = self._cache.tail(constants.MAX_CACHE_ROWS).reset_index(drop=True)
+
+        cache_size_mb = self.get_cache_size_mb()
+        if cache_size_mb > constants.MAX_CACHE_SIZE_MB:
+            bt.logging.warning(f"Cache exceeded {constants.MAX_CACHE_SIZE_MB}MB, clearing cache")
+            self.clear_cache()
+            # Fetch fresh data without cache
+            return self._fetch_reference_rate(
+                assets, start, end, end_inclusive, frequency, page_size, parallelize, time_inc_parallel, **kwargs
+            )
+
+        # Log cache stats periodically for monitoring
+        if len(self._cache) > 0:
+            self.log_cache_stats()
+
+        # Filter data for requested time range and assets
+        requested_assets = assets if isinstance(assets, list) else [assets]
+        asset_filter = self._cache["asset"].isin(requested_assets)
+        time_filter = self._cache["time"] <= end_time
+
         if start:
             start_time = pd.to_datetime(start)
-            return self._cache[(self._cache["time"] >= start_time) & (self._cache["time"] <= end_time)]
+            time_filter = time_filter & (self._cache["time"] >= start_time)
 
-        return self._cache[self._cache["time"] <= end_time]
+        return self._cache[asset_filter & time_filter]
 
     def get_pair_candles(
         self,

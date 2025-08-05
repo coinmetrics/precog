@@ -1,3 +1,4 @@
+import asyncio
 import time
 from typing import Tuple
 
@@ -9,15 +10,16 @@ from precog.utils.cm_data import CMData
 from precog.utils.timestamp import get_before, to_datetime, to_str
 
 
-def get_point_estimate(cm: CMData, timestamp: str) -> float:
+def get_point_estimate(cm: CMData, timestamp: str, asset: str = "BTC") -> float:
     """Make a naive forecast by predicting the most recent price
 
     Args:
         cm (CMData): The CoinMetrics API client
         timestamp (str): The current timestamp provided by the validator request
+        asset (str): The asset to predict (default: "BTC")
 
     Returns:
-        (float): The current BTC price tied to the provided timestamp
+        (float): The current asset price tied to the provided timestamp
     """
 
     # Ensure timestamp is correctly typed and set to UTC
@@ -25,7 +27,7 @@ def get_point_estimate(cm: CMData, timestamp: str) -> float:
 
     # Query CM API for a pandas dataframe with only one record
     price_data: pd.DataFrame = cm.get_CM_ReferenceRate(
-        assets="BTC",
+        assets=asset,
         start=None,
         end=to_str(provided_timestamp),
         frequency="1s",
@@ -35,13 +37,15 @@ def get_point_estimate(cm: CMData, timestamp: str) -> float:
     )
 
     # Get current price closest to the provided timestamp
-    btc_price: float = float(price_data["ReferenceRateUSD"].iloc[-1])
+    asset_price: float = float(price_data["ReferenceRateUSD"].iloc[-1])
 
-    # Return the current price of BTC as our point estimate
-    return btc_price
+    # Return the current price of the asset as our point estimate
+    return asset_price
 
 
-def get_prediction_interval(cm: CMData, timestamp: str, point_estimate: float) -> Tuple[float, float]:
+def get_prediction_interval(
+    cm: CMData, timestamp: str, point_estimate: float, asset: str = "BTC"
+) -> Tuple[float, float]:
     """Make a naive multi-step prediction interval by estimating
     the sample standard deviation
 
@@ -49,13 +53,14 @@ def get_prediction_interval(cm: CMData, timestamp: str, point_estimate: float) -
         cm (CMData): The CoinMetrics API client
         timestamp (str): The current timestamp provided by the validator request
         point_estimate (float): The center of the prediction interval
+        asset (str): The asset to predict (default: "BTC")
 
     Returns:
         (float): The 90% naive prediction interval lower bound
         (float): The 90% naive prediction interval upper bound
 
     Notes:
-        Make reasonable assumptions that the 1s BTC price residuals are
+        Make reasonable assumptions that the 1s asset price residuals are
         uncorrelated and normally distributed
     """
 
@@ -66,7 +71,7 @@ def get_prediction_interval(cm: CMData, timestamp: str, point_estimate: float) -
 
     # Query CM API for sample standard deviation of the 1s residuals
     historical_price_data: pd.DataFrame = cm.get_CM_ReferenceRate(
-        assets="BTC", start=to_str(start_time), end=to_str(end_time), frequency="1s"
+        assets=asset, start=to_str(start_time), end=to_str(end_time), frequency="1s"
     )
     residuals: pd.Series = historical_price_data["ReferenceRateUSD"].diff()
     sample_std_dev: float = float(residuals.std())
@@ -91,36 +96,61 @@ def get_prediction_interval(cm: CMData, timestamp: str, point_estimate: float) -
     return lower_bound, upper_bound
 
 
-def forward(synapse: Challenge, cm: CMData) -> Challenge:
-    total_start_time = time.perf_counter()
-    bt.logging.info(
-        f"👈 Received prediction request from: {synapse.dendrite.hotkey} for timestamp: {synapse.timestamp}"
-    )
+async def predict_asset(cm: CMData, timestamp: str, asset: str) -> Tuple[str, float, Tuple[float, float]]:
+    """Predict a single asset asynchronously"""
+    asset_start = time.perf_counter()
 
-    point_estimate_start = time.perf_counter()
     # Get the naive point estimate
-    point_estimate: float = get_point_estimate(cm=cm, timestamp=synapse.timestamp)
+    point_estimate: float = get_point_estimate(cm=cm, timestamp=timestamp, asset=asset)
 
-    point_estimate_time = time.perf_counter() - point_estimate_start
-    bt.logging.debug(f"⏱️ Point estimate function took: {point_estimate_time:.3f} seconds")
-
-    interval_start = time.perf_counter()
     # Get the naive prediction interval
     prediction_interval: Tuple[float, float] = get_prediction_interval(
-        cm=cm, timestamp=synapse.timestamp, point_estimate=point_estimate
+        cm=cm, timestamp=timestamp, point_estimate=point_estimate, asset=asset
     )
 
-    interval_time = time.perf_counter() - interval_start
-    bt.logging.debug(f"⏱️ Prediction interval function took: {interval_time:.3f} seconds")
+    asset_time = time.perf_counter() - asset_start
+    bt.logging.debug(f"⏱️ {asset} prediction took: {asset_time:.3f} seconds")
 
-    synapse.prediction = point_estimate
-    synapse.interval = prediction_interval
+    return asset, point_estimate, prediction_interval
+
+
+async def forward_async(synapse: Challenge, cm: CMData) -> Challenge:
+    total_start_time = time.perf_counter()
+
+    # Get list of assets to predict
+    assets = synapse.assets if hasattr(synapse, "assets") else ["BTC"]
+
+    bt.logging.info(
+        f"👈 Received prediction request from: {synapse.dendrite.hotkey} for {assets} at timestamp: {synapse.timestamp}"
+    )
+
+    # Create prediction tasks for all assets in parallel
+    tasks = [predict_asset(cm, synapse.timestamp, asset) for asset in assets]
+
+    # Run all predictions in parallel
+    results = await asyncio.gather(*tasks)
+
+    # Collect results
+    predictions = {}
+    intervals = {}
+
+    for asset, point_estimate, prediction_interval in results:
+        predictions[asset] = point_estimate
+        intervals[asset] = list(prediction_interval)
+
+    synapse.predictions = predictions
+    synapse.intervals = intervals
 
     total_time = time.perf_counter() - total_start_time
     bt.logging.debug(f"⏱️ Total forward call took: {total_time:.3f} seconds")
 
-    if synapse.prediction is not None:
-        bt.logging.success(f"Predicted price: {synapse.prediction}  |  Predicted Interval: {synapse.interval}")
+    if synapse.predictions:
+        bt.logging.success(f"Predictions complete for {list(predictions.keys())}")
     else:
-        bt.logging.info("No prediction for this request.")
+        bt.logging.info("No predictions for this request.")
     return synapse
+
+
+def forward(synapse: Challenge, cm: CMData) -> Challenge:
+    """Synchronous wrapper for async forward function"""
+    return asyncio.run(forward_async(synapse, cm))
