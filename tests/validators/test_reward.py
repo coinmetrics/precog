@@ -63,8 +63,6 @@ class TestReward(unittest.TestCase):
         responses = []
 
         for uid in range(250):
-            miner = self.mock_validator.MinerHistory[uid]
-
             if uid == 0:  # Perfect prediction
                 prediction = actual_price
                 interval = [actual_price - 100, actual_price + 100]
@@ -78,12 +76,15 @@ class TestReward(unittest.TestCase):
                 prediction = actual_price + np.random.normal(0, 1000)
                 interval = [prediction - 500, prediction + 500]
 
-            # Set up miner prediction history
-            miner.predictions[self.prediction_time] = prediction
-            miner.intervals[self.prediction_time] = interval
-
             # Create response
-            responses.append(Challenge(timestamp=self.timestamp_str, prediction=prediction, interval=interval))
+            responses.append(
+                Challenge(
+                    timestamp=self.timestamp_str,
+                    assets=["BTC"],
+                    predictions={"BTC": prediction},
+                    intervals={"BTC": interval},
+                )
+            )
 
         # Calculate rewards
         rewards = calc_rewards(self.mock_validator, responses)
@@ -123,8 +124,6 @@ class TestReward(unittest.TestCase):
         responses = []
 
         for uid in range(250):
-            miner = self.mock_validator.MinerHistory[uid]
-
             if uid < 5:  # First 5 miners: identical predictions
                 prediction = identical_prediction
                 interval = identical_interval
@@ -132,12 +131,15 @@ class TestReward(unittest.TestCase):
                 prediction = actual_price + np.random.normal(0, 1000)
                 interval = [prediction - 500, prediction + 500]
 
-            # Set up miner prediction history
-            miner.predictions[self.prediction_time] = prediction
-            miner.intervals[self.prediction_time] = interval
-
             # Create response
-            responses.append(Challenge(timestamp=self.timestamp_str, prediction=prediction, interval=interval))
+            responses.append(
+                Challenge(
+                    timestamp=self.timestamp_str,
+                    assets=["BTC"],
+                    predictions={"BTC": prediction},
+                    intervals={"BTC": interval},
+                )
+            )
 
         # Calculate rewards
         rewards = calc_rewards(self.mock_validator, responses)
