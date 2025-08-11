@@ -22,11 +22,20 @@ class Validator:
             while True:
                 await asyncio.sleep(1)
         except asyncio.CancelledError:
-            # Clean shutdown all tasks
-            for task in asyncio.all_tasks():
+            # Clean shutdown: cancel all tasks except current task
+            current_task = asyncio.current_task()
+            tasks = [t for t in asyncio.all_tasks() if t is not current_task]
+
+            # Cancel all other tasks
+            for task in tasks:
                 task.cancel()
-            await asyncio.gather(*asyncio.all_tasks(), return_exceptions=True)
-            return
+
+            # Wait for all tasks to complete cancellation
+            if tasks:
+                await asyncio.gather(*tasks, return_exceptions=True)
+
+            # Re-raise the CancelledError to allow proper cleanup
+            raise
 
 
 if __name__ == "__main__":
