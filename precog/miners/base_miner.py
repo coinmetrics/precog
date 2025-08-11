@@ -151,6 +151,6 @@ async def forward_async(synapse: Challenge, cm: CMData) -> Challenge:
     return synapse
 
 
-def forward(synapse: Challenge, cm: CMData) -> Challenge:
-    """Synchronous wrapper for async forward function"""
-    return asyncio.run(forward_async(synapse, cm))
+async def forward(synapse: Challenge, cm: CMData) -> Challenge:
+    """Async forward function for handling predictions"""
+    return await forward_async(synapse, cm)
