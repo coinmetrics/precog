@@ -128,8 +128,12 @@ def calc_rewards(
     if not historical_price_data.empty:
         for asset in assets:
             asset_data = historical_price_data[historical_price_data["asset"] == asset]
-            all_cm_data[asset] = pd_to_dict(asset_data)
-            bt.logging.info(f"CM data fetched for {asset}: {len(all_cm_data[asset])} price points")
+            if not asset_data.empty:
+                all_cm_data[asset] = pd_to_dict(asset_data)
+                bt.logging.info(f"CM data fetched for {asset}: {len(all_cm_data[asset])} price points")
+            else:
+                all_cm_data[asset] = {}
+                bt.logging.warning(f"No CM data returned for {asset}")
     else:
         bt.logging.warning("No CM data returned for any assets")
         for asset in assets:
