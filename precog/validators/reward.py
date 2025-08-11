@@ -129,7 +129,10 @@ def calc_rewards(
         for asset in assets:
             asset_data = historical_price_data[historical_price_data["asset"] == asset]
             if not asset_data.empty:
-                all_cm_data[asset] = pd_to_dict(asset_data)
+                bt.logging.info(
+                    f"Asset {asset}: DataFrame shape={asset_data.shape}, index={list(asset_data.index[:5])}, columns={list(asset_data.columns)}"
+                )
+                all_cm_data[asset] = pd_to_dict(asset_data)  # noqa
                 bt.logging.info(f"CM data fetched for {asset}: {len(all_cm_data[asset])} price points")
             else:
                 all_cm_data[asset] = {}
