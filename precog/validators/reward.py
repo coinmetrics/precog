@@ -51,7 +51,7 @@ def _process_asset_predictions(
         cm_data = all_cm_data[asset]
 
         # Handle point predictions
-        if asset not in response.predictions:
+        if not response.predictions or asset not in response.predictions:
             asset_point_errors[asset].append(np.inf)
             bt.logging.debug(f"UID: {uid} | {asset} | No prediction provided")
         else:
@@ -68,7 +68,7 @@ def _process_asset_predictions(
                 )
 
         # Handle interval predictions
-        if asset not in response.intervals:
+        if not response.intervals or asset not in response.intervals:
             asset_interval_scores[asset].append(0)
             bt.logging.debug(f"UID: {uid} | {asset} | No interval prediction provided")
         else:
@@ -117,15 +117,23 @@ def calc_rewards(
     # Get assets from the first response
     assets = responses[0].assets
 
-    # Fetch price data for all assets
+    # Fetch price data for all assets in one API call
+    bt.logging.info(f"Fetching CM data from {start_time} to {end_time} for assets: {assets}")
+    historical_price_data: DataFrame = cm.get_CM_ReferenceRate(
+        assets=assets, start=start_time, end=end_time, frequency="1s"
+    )
+
+    # Split data by asset
     all_cm_data = {}
-    for asset in assets:
-        bt.logging.info(f"Fetching CM data from {start_time} to {end_time} for {asset}")
-        historical_price_data: DataFrame = cm.get_CM_ReferenceRate(
-            assets=asset, start=start_time, end=end_time, frequency="1s"
-        )
-        all_cm_data[asset] = pd_to_dict(historical_price_data)
-        bt.logging.info(f"CM data fetched for {asset}: {len(all_cm_data[asset])} price points")
+    if not historical_price_data.empty:
+        for asset in assets:
+            asset_data = historical_price_data[historical_price_data["asset"] == asset]
+            all_cm_data[asset] = pd_to_dict(asset_data)
+            bt.logging.info(f"CM data fetched for {asset}: {len(all_cm_data[asset])} price points")
+    else:
+        bt.logging.warning("No CM data returned for any assets")
+        for asset in assets:
+            all_cm_data[asset] = {}
 
     # Initialize error tracking for each asset
     for asset in assets:

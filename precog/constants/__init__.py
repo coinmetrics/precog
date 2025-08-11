@@ -9,16 +9,15 @@ PREDICTION_FUTURE_HOURS: int = 1
 PREDICTION_INTERVAL_MINUTES: int = 5
 
 # Supported Assets
-SUPPORTED_ASSETS = ["BTC", "ETH", "TAO"]
-DEFAULT_ASSET = "BTC"
+SUPPORTED_ASSETS = ["btc", "eth"]
+DEFAULT_ASSET = "btc"
 
 # Task Weights - each asset has point and interval prediction tasks
 # Weights should sum to 1.0 across all tasks
 # Format: {asset: {"point": weight, "interval": weight}}
 TASK_WEIGHTS = {
-    "BTC": {"point": 0.25, "interval": 0.25},
-    "ETH": {"point": 0.17, "interval": 0.17},
-    "TAO": {"point": 0.08, "interval": 0.08},
+    "btc": {"point": 0.25, "interval": 0.25},
+    "eth": {"point": 0.25, "interval": 0.25},
 }
 
 # Cache limits to prevent memory leaks
