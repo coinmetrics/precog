@@ -36,9 +36,9 @@ class Challenge(bt.Synapse):
 
     # Assets to predict, filled by sending dendrite caller.
     assets: List[str] = pydantic.Field(
-        default=["BTC"],
+        default=["btc"],
         title="Assets",
-        description="The list of assets to predict (e.g., ['BTC', 'ETH', 'TAO'])",
+        description="The list of assets to predict (e.g., ['btc', 'eth', 'tao_bittensor'])",
         allow_mutation=False,
     )
 

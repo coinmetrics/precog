@@ -10,13 +10,13 @@ from precog.utils.cm_data import CMData
 from precog.utils.timestamp import get_before, to_datetime, to_str
 
 
-def get_point_estimate(cm: CMData, timestamp: str, asset: str = "BTC") -> float:
+def get_point_estimate(cm: CMData, timestamp: str, asset: str = "btc") -> float:
     """Make a naive forecast by predicting the most recent price
 
     Args:
         cm (CMData): The CoinMetrics API client
         timestamp (str): The current timestamp provided by the validator request
-        asset (str): The asset to predict (default: "BTC")
+        asset (str): The asset to predict (default: "btc")
 
     Returns:
         (float): The current asset price tied to the provided timestamp
@@ -44,7 +44,7 @@ def get_point_estimate(cm: CMData, timestamp: str, asset: str = "BTC") -> float:
 
 
 def get_prediction_interval(
-    cm: CMData, timestamp: str, point_estimate: float, asset: str = "BTC"
+    cm: CMData, timestamp: str, point_estimate: float, asset: str = "btc"
 ) -> Tuple[float, float]:
     """Make a naive multi-step prediction interval by estimating
     the sample standard deviation
@@ -53,7 +53,7 @@ def get_prediction_interval(
         cm (CMData): The CoinMetrics API client
         timestamp (str): The current timestamp provided by the validator request
         point_estimate (float): The center of the prediction interval
-        asset (str): The asset to predict (default: "BTC")
+        asset (str): The asset to predict (default: "btc")
 
     Returns:
         (float): The 90% naive prediction interval lower bound
@@ -117,8 +117,9 @@ async def predict_asset(cm: CMData, timestamp: str, asset: str) -> Tuple[str, fl
 async def forward_async(synapse: Challenge, cm: CMData) -> Challenge:
     total_start_time = time.perf_counter()
 
-    # Get list of assets to predict
-    assets = synapse.assets if hasattr(synapse, "assets") else ["BTC"]
+    # Get list of assets to predict and ensure lowercase
+    raw_assets = synapse.assets if hasattr(synapse, "assets") else ["btc"]
+    assets = [asset.lower() for asset in raw_assets]
 
     bt.logging.info(
         f"👈 Received prediction request from: {synapse.dendrite.hotkey} for {assets} at timestamp: {synapse.timestamp}"
