@@ -9,10 +9,7 @@ from coinmetrics.api_client import CoinMetricsClient
 class CMData:
     def __init__(self, api_key: str = "") -> None:
         self._api_key = api_key
-        if api_key:
-            self._client = CoinMetricsClient(api_key)
-        else:
-            self._client = CoinMetricsClient()  # No arguments, like your working script
+        self._client = CoinMetricsClient(api_key)
         self._cache = pd.DataFrame()
         self._last_update = None
 
