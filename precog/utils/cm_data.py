@@ -9,7 +9,10 @@ from coinmetrics.api_client import CoinMetricsClient
 class CMData:
     def __init__(self, api_key: str = "") -> None:
         self._api_key = api_key
-        self._client = CoinMetricsClient(self.api_key)
+        if api_key:
+            self._client = CoinMetricsClient(api_key)
+        else:
+            self._client = CoinMetricsClient()  # No arguments, like your working script
         self._cache = pd.DataFrame()
         self._last_update = None
 
@@ -105,50 +108,20 @@ class CMData:
                 **kwargs,
             )
 
-            self._cache = pd.concat([self._cache, new_data]).drop_duplicates(subset=["time", "asset"])
-            self._cache.sort_values(["time", "asset"], inplace=True)
+            self._cache = pd.concat([self._cache, new_data]).drop_duplicates(subset=["time"])
+            self._cache.sort_values("time", inplace=True)
             self._last_update = end_time
 
         # Remove data older than 24 hours from latest point
         cutoff_time = end_time - pd.Timedelta(days=1)
+        self._cache = self._cache[self._cache["time"] >= cutoff_time].reset_index(drop=True)
 
-        # Also limit to only currently supported assets to prevent unbounded growth
-        from precog import constants
-
-        supported_assets = constants.SUPPORTED_ASSETS
-
-        self._cache = self._cache[
-            (self._cache["time"] >= cutoff_time) & (self._cache["asset"].isin(supported_assets))
-        ].reset_index(drop=True)
-
-        # Enforce hard size limits to prevent memory leaks
-        if len(self._cache) > constants.MAX_CACHE_ROWS:
-            bt.logging.warning(f"Cache exceeded {constants.MAX_CACHE_ROWS} rows, keeping most recent data")
-            self._cache = self._cache.tail(constants.MAX_CACHE_ROWS).reset_index(drop=True)
-
-        cache_size_mb = self.get_cache_size_mb()
-        if cache_size_mb > constants.MAX_CACHE_SIZE_MB:
-            bt.logging.warning(f"Cache exceeded {constants.MAX_CACHE_SIZE_MB}MB, clearing cache")
-            self.clear_cache()
-            # Fetch fresh data without cache
-            return self._fetch_reference_rate(
-                assets, start, end, end_inclusive, frequency, page_size, parallelize, time_inc_parallel, **kwargs
-            )
-
-        # Log cache stats periodically for monitoring
-        if len(self._cache) > 0:
-            self.log_cache_stats()
-
-        # Filter data for requested time range and assets
-        requested_assets = assets if isinstance(assets, list) else [assets]
-        asset_filter = self._cache["asset"].isin(requested_assets)
-        time_filter = self._cache["time"] <= end_time
-
+        # Filter data for requested time range
         if start:
             start_time = pd.to_datetime(start)
-            time_filter = time_filter & (self._cache["time"] >= start_time)
+            return self._cache[(self._cache["time"] >= start_time) & (self._cache["time"] <= end_time)]
 
-        return self._cache[asset_filter & time_filter]
+        return self._cache[self._cache["time"] <= end_time]
 
     def get_pair_candles(
         self,
@@ -262,7 +235,7 @@ class CMData:
         """Internal method to fetch reference rate data from CM API"""
         reference_rate = self.client.get_asset_metrics(
             assets,
-            metrics="ReferenceRateUSD",
+            metrics=["ReferenceRateUSD"],
             start_time=start,
             end_time=end,
             end_inclusive=end_inclusive,
@@ -275,6 +248,9 @@ class CMData:
             reference_rate_df = reference_rate.parallel(time_increment=time_inc_parallel).to_dataframe()
         else:
             reference_rate_df = reference_rate.to_dataframe()
+
+        if reference_rate_df.empty or "time" not in reference_rate_df.columns:
+            return reference_rate_df
 
         return reference_rate_df.sort_values("time").reset_index(drop=True)
 
