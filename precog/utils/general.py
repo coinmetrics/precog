@@ -120,5 +120,5 @@ def func_with_retry(func: Callable, max_attempts: int = 3, delay: float = 1, *ar
 def pd_to_dict(data: DataFrame) -> dict:
     price_dict = {}
     for i in range(len(data)):
-        price_dict[data.time[i].to_pydatetime()] = data.iloc[i]["ReferenceRateUSD"].item()
+        price_dict[data.iloc[i]["time"].to_pydatetime()] = data.iloc[i]["ReferenceRateUSD"].item()
     return price_dict
