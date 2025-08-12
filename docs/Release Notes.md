@@ -1,5 +1,10 @@
 Release Notes
 =============
+3.0.0
+-----
+Released on TBD
+- TBD
+
 2.5.4
 -----
 Released on August 21st 2025
