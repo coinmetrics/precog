@@ -78,14 +78,22 @@ def get_prediction_interval(
 
     # We have the standard deviation of the 1s residuals
     # We are forecasting forward 60m, which is 3600s
-    # We must scale the 1s sample standard deviation to reflect a 3600s forecast
-    # Make reasonable assumptions that the 1s residuals are uncorrelated and normally distributed
-    # To do this naively, we multiply the std dev by the square root of the number of time steps
+    # Scale the 1s sample standard deviation, but cap the time scaling to prevent massive intervals
+    # Use a much more conservative scaling that considers price level
     time_steps: int = 3600
-    naive_forecast_std_dev: float = sample_std_dev * (time_steps**0.5)
+
+    # Cap the time scaling
+    # Use a logarithmic scaling that's more reasonable for short-term predictions
+    import math
+
+    time_scaling = min(math.sqrt(time_steps), 12.0)  # Cap at 12x instead of 60x
+
+    # Scale down further based on price level - higher priced assets need proportionally smaller intervals
+    price_scaling = max(0.3, min(1.0, 1000.0 / point_estimate))  # Scale between 0.3x and 1.0x
+
+    naive_forecast_std_dev: float = sample_std_dev * time_scaling * price_scaling
 
     # For a 90% prediction interval, we use the coefficient 1.64
-    # Make reasonable assumptions that the 1s residuals are uncorrelated and normally distributed
     coefficient: float = 1.64
 
     # Calculate the lower bound and upper bound
