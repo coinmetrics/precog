@@ -46,8 +46,7 @@ def get_point_estimate(cm: CMData, timestamp: str, asset: str = "btc") -> float:
 def get_prediction_interval(
     cm: CMData, timestamp: str, point_estimate: float, asset: str = "btc"
 ) -> Tuple[float, float]:
-    """Make a naive multi-step prediction interval by estimating
-    the sample standard deviation
+    """Make a reasonable prediction interval using hourly volatility
 
     Args:
         cm (CMData): The CoinMetrics API client
@@ -56,52 +55,65 @@ def get_prediction_interval(
         asset (str): The asset to predict (default: "btc")
 
     Returns:
-        (float): The 90% naive prediction interval lower bound
-        (float): The 90% naive prediction interval upper bound
-
-    Notes:
-        Make reasonable assumptions that the 1s asset price residuals are
-        uncorrelated and normally distributed
+        (float): The 90% prediction interval lower bound
+        (float): The 90% prediction interval upper bound
     """
+    try:
+        # Get hourly data for the past 7 days to estimate realistic volatility
+        start_time = get_before(timestamp, days=7, minutes=0, seconds=0)
+        end_time = to_datetime(timestamp)
 
-    # Set the time range to be 24 hours
-    # Ensure both timestamps are correctly typed and set to UTC
-    start_time = get_before(timestamp, days=1, minutes=0, seconds=0)
-    end_time = to_datetime(timestamp)
+        # Query CM API for hourly data (much more appropriate for 1-hour predictions)
+        historical_price_data: pd.DataFrame = cm.get_CM_ReferenceRate(
+            assets=asset, start=to_str(start_time), end=to_str(end_time), frequency="1h"
+        )
 
-    # Query CM API for sample standard deviation of the 1s residuals
-    historical_price_data: pd.DataFrame = cm.get_CM_ReferenceRate(
-        assets=asset, start=to_str(start_time), end=to_str(end_time), frequency="1s"
-    )
-    residuals: pd.Series = historical_price_data["ReferenceRateUSD"].diff()
-    sample_std_dev: float = float(residuals.std())
+        if historical_price_data.empty or len(historical_price_data) < 24:
+            bt.logging.warning(f"Insufficient data for {asset}, using conservative fallback interval")
+            # Conservative fallback: ±5% of point estimate
+            margin = point_estimate * 0.05
+            return point_estimate - margin, point_estimate + margin
 
-    # We have the standard deviation of the 1s residuals
-    # We are forecasting forward 60m, which is 3600s
-    # Scale the 1s sample standard deviation, but cap the time scaling to prevent massive intervals
-    # Use a much more conservative scaling that considers price level
-    time_steps: int = 3600
+        # Calculate hourly returns (percentage changes)
+        prices = historical_price_data["ReferenceRateUSD"]
+        hourly_returns = prices.pct_change().dropna()
 
-    # Cap the time scaling
-    # Use a logarithmic scaling that's more reasonable for short-term predictions
-    import math
+        # Remove extreme outliers (beyond 3 std devs) to get realistic volatility
+        returns_std = hourly_returns.std()
+        returns_mean = hourly_returns.mean()
+        outlier_mask = abs(hourly_returns - returns_mean) <= 3 * returns_std
+        clean_returns = hourly_returns[outlier_mask]
 
-    time_scaling = min(math.sqrt(time_steps), 12.0)  # Cap at 12x instead of 60x
+        if len(clean_returns) < 12:
+            bt.logging.warning(f"Too few clean data points for {asset}, using conservative fallback")
+            margin = point_estimate * 0.05
+            return point_estimate - margin, point_estimate + margin
 
-    # Scale down further based on price level - higher priced assets need proportionally smaller intervals
-    price_scaling = max(0.3, min(1.0, 1000.0 / point_estimate))  # Scale between 0.3x and 1.0x
+        # Use standard deviation of hourly returns for 1-hour prediction
+        hourly_vol = float(clean_returns.std())
 
-    naive_forecast_std_dev: float = sample_std_dev * time_scaling * price_scaling
+        # For 90% prediction interval, use 1.64 standard deviations
+        # Convert percentage volatility back to price terms
+        margin = point_estimate * hourly_vol * 1.64
 
-    # For a 90% prediction interval, we use the coefficient 1.64
-    coefficient: float = 1.64
+        # Apply reasonable bounds to prevent unrealistic intervals
+        max_margin = point_estimate * 0.15  # Cap at ±15%
+        min_margin = point_estimate * 0.01  # Minimum ±1%
 
-    # Calculate the lower bound and upper bound
-    lower_bound: float = point_estimate - coefficient * naive_forecast_std_dev
-    upper_bound: float = point_estimate + coefficient * naive_forecast_std_dev
+        margin = max(min_margin, min(margin, max_margin))
 
-    # Return the naive prediction interval for our forecast
-    return lower_bound, upper_bound
+        lower_bound = point_estimate - margin
+        upper_bound = point_estimate + margin
+
+        bt.logging.debug(f"{asset}: hourly_vol={hourly_vol:.4f}, margin=${margin:.2f}")
+
+        return lower_bound, upper_bound
+
+    except Exception as e:
+        bt.logging.error(f"Error calculating interval for {asset}: {e}")
+        # Emergency fallback: ±3% interval
+        margin = point_estimate * 0.03
+        return point_estimate - margin, point_estimate + margin
 
 
 async def predict_asset(cm: CMData, timestamp: str, asset: str) -> Tuple[str, float, Tuple[float, float]]:
