@@ -72,6 +72,10 @@ class weight_setter:
         self.loop.create_task(loop_handler(self, self.clear_old_miner_histories, sleep_time=3600))
 
     def __exit__(self, exc_type, exc_value, traceback):
+        bt.logging.warning(f"weight_setter.__exit__ called with exc_type={exc_type}, exc_value={exc_value}")
+        if exc_type:
+            bt.logging.error(f"Exit traceback: {traceback}")
+
         self.save_state()
         try:
             # Set stop_event to signal all loop_handler tasks to stop gracefully

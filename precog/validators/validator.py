@@ -2,6 +2,8 @@ import argparse
 import asyncio
 from pathlib import Path
 
+import bittensor as bt
+
 from precog.utils.config import config
 from precog.validators.weight_setter import weight_setter
 
@@ -36,6 +38,16 @@ class Validator:
 
             # Re-raise the CancelledError to allow proper cleanup
             raise
+        except Exception as e:
+            import traceback
+
+            bt.logging.error(f"Validator main loop error: {e}")
+            bt.logging.error(f"Traceback: {traceback.format_exc()}")
+            raise
+        finally:
+            # Properly cleanup weight_setter
+            if hasattr(self, "weight_setter"):
+                self.weight_setter.__exit__(None, None, None)
 
 
 if __name__ == "__main__":
