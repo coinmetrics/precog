@@ -74,13 +74,23 @@ class weight_setter:
     def __exit__(self, exc_type, exc_value, traceback):
         self.save_state()
         try:
+            # Set stop_event to signal all loop_handler tasks to stop gracefully
+            self.stop_event.set()
+
+            # Get all pending tasks
             pending = asyncio.all_tasks(self.loop)
+
+            # Cancel all tasks
             for task in pending:
                 task.cancel()
+
+            # Wait for all tasks to complete cancellation
+            if pending:
+                self.loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+
         except Exception as e:
-            bt.logging.error(f"Error on __exit__ function: {e}")
+            bt.logging.error(f"Error during cleanup in __exit__: {e}")
         finally:
-            asyncio.gather(*pending, return_exceptions=True)
             self.loop.stop()
 
     def __reset_instance__(self):
