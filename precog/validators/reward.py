@@ -11,26 +11,66 @@ from precog.utils.general import get_average_weights_for_ties, pd_to_dict, rank
 from precog.utils.timestamp import get_before, to_datetime, to_str
 
 
-def _calculate_interval_score(prediction_time, eval_time, interval_bounds, cm_data):
+def _calculate_interval_score(prediction_time, eval_time, interval_bounds, cm_data, uid=None):  # noqa: C901
     """Calculate interval score for a single asset prediction."""
     hour_prices = []
     items_checked = 0
+
+    # Debug: Check the first few iterations to see what's happening (only for UIDs 8 and 30)
+    debug_enabled = uid in [8, 30]
+    debug_first_items = 5
+    debug_count = 0
+
     for price_time, price_value in cm_data.items():
         items_checked += 1
-        if prediction_time <= price_time <= eval_time:
+
+        # Debug first few items for specific UIDs only
+        if debug_enabled and debug_count < debug_first_items:
+            in_range = prediction_time <= price_time <= eval_time
+            bt.logging.debug(
+                f"_calculate_interval_score item {debug_count}: "
+                f"time={price_time}, value={price_value:.2f}, "
+                f"in_range={in_range}"
+            )
+            if not in_range:
+                bt.logging.debug(f"  Range check details: pred={prediction_time} <= {price_time} <= eval={eval_time}")
+                bt.logging.debug(
+                    f"  pred <= price: {prediction_time <= price_time}, " f"price <= eval: {price_time <= eval_time}"
+                )
+            debug_count += 1
+
+        in_range_actual = prediction_time <= price_time <= eval_time
+        if in_range_actual:
             hour_prices.append(price_value)
+            if debug_enabled and debug_count <= 5:
+                bt.logging.debug(f"_calculate_interval_score UID {uid}: Added price {price_value} at {price_time}")
+        elif debug_enabled and debug_count <= 5:
+            bt.logging.debug(f"_calculate_interval_score UID {uid}: REJECTED price {price_value} at {price_time}")
+
+    if debug_enabled:
+        bt.logging.debug(f"_calculate_interval_score UID {uid}: Found {len(hour_prices)} prices in range")
 
     if not hour_prices:
-        bt.logging.debug(f"_calculate_interval_score: Checked {items_checked} items, found 0 in range")
-        if items_checked == 0:
-            bt.logging.debug("_calculate_interval_score: cm_data.items() returned no items!")
-        elif items_checked == 1 and eval_time in cm_data:
-            single_time = list(cm_data.keys())[0]
-            bt.logging.debug(f"_calculate_interval_score: Only one item in dict: {single_time}")
-            bt.logging.debug(f"_calculate_interval_score: prediction_time={prediction_time}, eval_time={eval_time}")
+        if debug_enabled:
+            bt.logging.debug(f"_calculate_interval_score UID {uid}: Checked {items_checked} items, found 0 in range")
             bt.logging.debug(
-                f"_calculate_interval_score: Check failed: {prediction_time} <= {single_time} <= {eval_time} = {prediction_time <= single_time <= eval_time}"
+                f"_calculate_interval_score UID {uid}: prediction_time type: {type(prediction_time)}, value: {prediction_time}"
             )
+            bt.logging.debug(
+                f"_calculate_interval_score UID {uid}: eval_time type: {type(eval_time)}, value: {eval_time}"
+            )
+
+            # Check if the times are in cm_data
+            if prediction_time in cm_data:
+                bt.logging.debug(f"_calculate_interval_score UID {uid}: prediction_time IS in cm_data")
+            else:
+                bt.logging.debug(f"_calculate_interval_score UID {uid}: prediction_time NOT in cm_data")
+
+            if eval_time in cm_data:
+                bt.logging.debug(f"_calculate_interval_score UID {uid}: eval_time IS in cm_data")
+            else:
+                bt.logging.debug(f"_calculate_interval_score UID {uid}: eval_time NOT in cm_data")
+
         return 0
 
     pred_min = min(interval_bounds)
@@ -89,7 +129,9 @@ def _process_asset_predictions(
             bt.logging.debug(f"UID: {uid} | {asset} | No interval prediction provided")
         else:
             interval_bounds = response.intervals[asset]
-            interval_score_value = _calculate_interval_score(prediction_time, eval_time, interval_bounds, cm_data)
+            interval_score_value = _calculate_interval_score(
+                prediction_time, eval_time, interval_bounds, cm_data, uid=uid
+            )
             asset_interval_scores[asset].append(interval_score_value)
 
             if interval_score_value > 0:
