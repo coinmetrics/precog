@@ -62,6 +62,10 @@ def _process_asset_predictions(
     for asset in assets:
         cm_data = all_cm_data[asset]
 
+        # Debug logging for UIDs 8 and 30
+        if uid in [8, 30]:
+            bt.logging.debug(f"UID {uid} | {asset} | cm_data has {len(cm_data)} entries")
+
         # Handle point predictions
         if not response.predictions or asset not in response.predictions:
             asset_point_errors[asset].append(np.inf)
@@ -98,7 +102,7 @@ def _process_asset_predictions(
                 bt.logging.debug(f"UID: {uid} | {asset} | No price data for interval evaluation")
 
 
-def calc_rewards(
+def calc_rewards(  # noqa: C901
     self,
     responses: List[Challenge],
 ) -> np.ndarray:
@@ -144,8 +148,23 @@ def calc_rewards(
                 bt.logging.info(
                     f"Asset {asset}: DataFrame shape={asset_data.shape}, index={list(asset_data.index[:5])}, columns={list(asset_data.columns)}"
                 )
+                # Debug: Check DataFrame time range before conversion
+                bt.logging.debug(
+                    f"Asset {asset} DataFrame time range: {asset_data['time'].min()} to {asset_data['time'].max()}"
+                )
+                bt.logging.debug(f"Asset {asset} DataFrame has {len(asset_data)} rows")
+
                 all_cm_data[asset] = pd_to_dict(asset_data)  # noqa
                 bt.logging.info(f"CM data fetched for {asset}: {len(all_cm_data[asset])} price points")
+
+                # Debug: Verify dict has expected entries
+                dict_times = list(all_cm_data[asset].keys())
+                if dict_times:
+                    bt.logging.debug(f"Asset {asset} dict time range: {min(dict_times)} to {max(dict_times)}")
+                    if len(dict_times) != len(asset_data):
+                        bt.logging.warning(
+                            f"Asset {asset}: DataFrame had {len(asset_data)} rows but dict has {len(dict_times)} entries!"
+                        )
             else:
                 all_cm_data[asset] = {}
                 bt.logging.warning(f"No CM data returned for {asset}")
@@ -159,14 +178,35 @@ def calc_rewards(
         asset_point_errors[asset] = []
         asset_interval_scores[asset] = []
 
+    # Debug: Log initial all_cm_data state
+    bt.logging.debug("Initial all_cm_data sizes after fetching:")
+    for asset in assets:
+        bt.logging.debug(f"  {asset}: {len(all_cm_data[asset])} entries, id: {id(all_cm_data[asset])}")
+
     for uid, response in zip(self.available_uids, responses):
         # Store multi-asset predictions in MinerHistory
         self.MinerHistory[uid].add_prediction(response.timestamp, response.predictions, response.intervals)
+
+        # Debug logging for specific UIDs
+        if uid in [8, 30]:
+            bt.logging.debug(f"UID {uid} - Before processing, all_cm_data sizes:")
+            for asset in assets:
+                bt.logging.debug(f"  {asset}: {len(all_cm_data[asset])} entries")
+                if len(all_cm_data[asset]) <= 5:
+                    bt.logging.debug(f"    Keys: {list(all_cm_data[asset].keys())}")
 
         # Process all asset predictions for this miner
         _process_asset_predictions(
             uid, response, assets, all_cm_data, eval_time, asset_point_errors, asset_interval_scores, prediction_time
         )
+
+        # Debug logging after processing
+        if uid in [8, 30]:
+            bt.logging.debug(f"UID {uid} - After processing, all_cm_data sizes:")
+            for asset in assets:
+                bt.logging.debug(f"  {asset}: {len(all_cm_data[asset])} entries")
+                if len(all_cm_data[asset]) <= 5:
+                    bt.logging.debug(f"    Keys: {list(all_cm_data[asset].keys())}")
 
     # Score, rank, and weight each task independently
     task_weights = {}
