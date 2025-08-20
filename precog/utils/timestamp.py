@@ -104,7 +104,8 @@ def to_datetime(timestamp: Union[str, float]) -> datetime:
     if isinstance(timestamp, str):
         # Assume the proper iso 8601 string format is used
         # `strptime` will trigger an error as needed
-        return datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=get_timezone())
+        naive_dt = datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S.%fZ")
+        return get_timezone().localize(naive_dt)
 
     elif isinstance(timestamp, float):
         # Assume proper float value
