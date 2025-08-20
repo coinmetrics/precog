@@ -14,7 +14,7 @@ readme = "README.md"
 python = ">= 3.9, < 3.12"
 
 # Bittensor Version Strict
-bittensor = "9.1.0"
+bittensor = "^9.9.0"
 bittensor-cli = "9.1.4"
 
 # Bittensor Dependencies We Also Need
@@ -24,7 +24,7 @@ pydantic = "^2.3.0"
 requests = "^2.32.3"
 
 # Subnet Specific Dependencies
-coinmetrics-api-client = "^2024.11.21.20"
+coinmetrics-api-client = "^2025.8.15.15"
 pytz = "^2024.2"
 pandas = "^2.2.3"
 gitpython = "^3.1.43"
