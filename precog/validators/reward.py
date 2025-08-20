@@ -13,12 +13,29 @@ from precog.utils.timestamp import get_before, to_datetime, to_str
 
 def _calculate_interval_score(prediction_time, eval_time, interval_bounds, cm_data):
     """Calculate interval score for a single asset prediction."""
+    # Debug logging
+    if len(cm_data) == 0:
+        bt.logging.debug("_calculate_interval_score: cm_data is empty!")
+    else:
+        # Check if eval_time is in cm_data
+        if eval_time in cm_data:
+            bt.logging.debug(f"_calculate_interval_score: eval_time {eval_time} found in cm_data")
+        else:
+            bt.logging.debug(f"_calculate_interval_score: eval_time {eval_time} NOT in cm_data")
+            # Show what times are actually in cm_data (first and last few)
+            cm_times = list(cm_data.keys())
+            if cm_times:
+                bt.logging.debug(f"_calculate_interval_score: First time in cm_data: {cm_times[0]}")
+                bt.logging.debug(f"_calculate_interval_score: Last time in cm_data: {cm_times[-1]}")
+
     hour_prices = []
     for price_time, price_value in cm_data.items():
         if prediction_time <= price_time <= eval_time:
             hour_prices.append(price_value)
 
     if not hour_prices:
+        bt.logging.debug(f"_calculate_interval_score: No prices found between {prediction_time} and {eval_time}")
+        bt.logging.debug(f"_calculate_interval_score: cm_data has {len(cm_data)} entries")
         return 0
 
     pred_min = min(interval_bounds)
