@@ -1,5 +1,11 @@
 Release Notes
 =============
+2.5.4
+-----
+Released on August 21st 2025
+- Upgrade Bittensor SDK and CLI version
+- Upgrade dev dependencies
+
 2.5.3
 -----
 Released on July 10th 2025
