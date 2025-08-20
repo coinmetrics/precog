@@ -1,5 +1,10 @@
 Release Notes
 =============
+3.0.0
+-----
+Released on TBD
+- TBD
+
 2.5.3
 -----
 Released on July 10th 2025

@@ -17,7 +17,7 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 import bittensor as bt
 import pydantic
@@ -34,34 +34,33 @@ class Challenge(bt.Synapse):
         allow_mutation=False,
     )
 
+    # Assets to predict, filled by sending dendrite caller.
+    assets: List[str] = pydantic.Field(
+        default=["btc"],
+        title="Assets",
+        description="The list of assets to predict (e.g., ['btc', 'eth', 'tao_bittensor'])",
+        allow_mutation=False,
+    )
+
     # Optional request output, filled by recieving axon.
-    prediction: Optional[float] = pydantic.Field(
+    predictions: Optional[Dict[str, float]] = pydantic.Field(
         default=None,
         title="Predictions",
-        description="The predictions to send to the dendrite caller",
+        description="The predictions for each asset",
     )
 
     # Optional request output, filled by recieving axon.
-    interval: Optional[List[float]] = pydantic.Field(
+    intervals: Optional[Dict[str, List[float]]] = pydantic.Field(
         default=None,
-        title="Interval",
-        description="The predicted interval for the next hour. Formatted as [min, max]",
+        title="Intervals",
+        description="The predicted intervals for each asset. Formatted as {asset: [min, max]}",
     )
 
-    def deserialize(self) -> int:
+    def deserialize(self) -> Dict[str, float]:
         """
-        Deserialize the dummy output. This method retrieves the response from
-        the miner in the form of dummy_output, deserializes it and returns it
-        as the output of the dendrite.query() call.
+        Deserialize the predictions output.
 
         Returns:
-        - int: The deserialized response, which in this case is the value of dummy_output.
-
-        Example:
-        Assuming a Dummy instance has a dummy_output value of 5:
-        >>> dummy_instance = Dummy(dummy_input=4)
-        >>> dummy_instance.dummy_output = 5
-        >>> dummy_instance.deserialize()
-        5
+        - Dict[str, float]: The deserialized response containing predictions for each asset.
         """
-        return self.prediction
+        return self.predictions

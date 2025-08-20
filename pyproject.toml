@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "precog"
-version = "2.5.3"
+version = "3.0.0"
 description = "Bitcoin Price Prediction Subnet"
 authors = ["Coin Metrics", "Yuma Group"]
 readme = "README.md"
@@ -24,7 +24,7 @@ pydantic = "^2.3.0"
 requests = "^2.32.3"
 
 # Subnet Specific Dependencies
-coinmetrics-api-client = "^2024.11.21.20"
+coinmetrics-api-client = "^2025.8.8.16"
 pytz = "^2024.2"
 pandas = "^2.2.3"
 gitpython = "^3.1.43"

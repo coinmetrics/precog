@@ -1,6 +1,7 @@
 import asyncio
 import re
 import time
+import traceback
 from typing import Any, Callable, Optional
 
 import bittensor as bt
@@ -83,22 +84,39 @@ def get_average_weights_for_ties(ranks, decay):
 
 
 async def loop_handler(self, func: Callable, sleep_time: float = 120):
+    """
+    Handles repeated execution of a function with proper error handling.
+    Only sets stop_event if explicitly intended to stop all tasks.
+    """
+    func_name = func.__name__
     try:
         while not self.stop_event.is_set():
-            async with self.lock:
-                await func()
-            await asyncio.sleep(sleep_time)
+            try:
+                async with self.lock:
+                    await func()
+                await asyncio.sleep(sleep_time)
+            except Exception as inner_e:
+                # Log the error but continue the loop unless it's critical
+                bt.logging.error(f"{func_name} encountered error (will retry): {inner_e}")
+                bt.logging.error(f"Traceback: {traceback.format_exc()}")
+                # Wait a bit before retrying
+                await asyncio.sleep(min(sleep_time, 10))
+                continue
+
     except asyncio.CancelledError:
-        bt.logging.error(f"{func.__name__} cancelled")
+        bt.logging.info(f"{func_name} cancelled during shutdown")
         raise
     except KeyboardInterrupt:
-        raise
-    except Exception as e:
-        bt.logging.error(f"{func.__name__} raised error: {e}")
-        raise e
-    finally:
+        bt.logging.info(f"{func_name} stopped by keyboard interrupt")
+        # Only set stop_event on explicit user interrupt
         async with self.lock:
             self.stop_event.set()
+        raise
+    except Exception as e:
+        bt.logging.error(f"{func_name} raised critical error: {e}")
+        bt.logging.error(f"Full traceback: {traceback.format_exc()}")
+        # Don't set stop_event - let other tasks continue
+        raise e
 
 
 def func_with_retry(func: Callable, max_attempts: int = 3, delay: float = 1, *args, **kwargs) -> Any:
@@ -120,5 +138,5 @@ def func_with_retry(func: Callable, max_attempts: int = 3, delay: float = 1, *ar
 def pd_to_dict(data: DataFrame) -> dict:
     price_dict = {}
     for i in range(len(data)):
-        price_dict[data.time[i].to_pydatetime()] = data.iloc[i]["ReferenceRateUSD"].item()
+        price_dict[data.iloc[i]["time"].to_pydatetime()] = data.iloc[i]["ReferenceRateUSD"].item()
     return price_dict

@@ -9,7 +9,7 @@ from coinmetrics.api_client import CoinMetricsClient
 class CMData:
     def __init__(self, api_key: str = "") -> None:
         self._api_key = api_key
-        self._client = CoinMetricsClient(self.api_key)
+        self._client = CoinMetricsClient(api_key)
         self._cache = pd.DataFrame()
         self._last_update = None
 
@@ -232,7 +232,7 @@ class CMData:
         """Internal method to fetch reference rate data from CM API"""
         reference_rate = self.client.get_asset_metrics(
             assets,
-            metrics="ReferenceRateUSD",
+            metrics=["ReferenceRateUSD"],
             start_time=start,
             end_time=end,
             end_inclusive=end_inclusive,
@@ -245,6 +245,9 @@ class CMData:
             reference_rate_df = reference_rate.parallel(time_increment=time_inc_parallel).to_dataframe()
         else:
             reference_rate_df = reference_rate.to_dataframe()
+
+        if reference_rate_df.empty or "time" not in reference_rate_df.columns:
+            return reference_rate_df
 
         return reference_rate_df.sort_values("time").reset_index(drop=True)
 
