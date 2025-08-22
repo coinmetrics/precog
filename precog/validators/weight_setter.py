@@ -185,7 +185,7 @@ class weight_setter:
         )
         return responses, timestamp
 
-    async def set_weights(self):
+    async def set_weights(self):  # noqa: C901
         try:
             self.blocks_since_last_update = func_with_retry(
                 self.subtensor.blocks_since_last_update, netuid=self.config.netuid, uid=self.my_uid
@@ -210,28 +210,34 @@ class weight_setter:
                 bt.logging.debug(f"UID: {j}  |  Weight: {i}")
             if sum(weights) == 0:
                 weights = [1] * len(weights)
-            # Convert to uint16 weights and uids.
-            (
-                uint_uids,
-                uint_weights,
-            ) = bt.utils.weight_utils.convert_weights_and_uids_for_emit(uids=uids, weights=array(weights))
-            # Update the incentive mechanism on the Bittensor blockchain.
-            result, msg = self.subtensor.set_weights(
-                netuid=self.config.netuid,
-                wallet=self.wallet,
-                uids=uint_uids,
-                weights=uint_weights,
-                wait_for_inclusion=True,
-                version_key=__spec_version__,
-            )
-            if result:
-                bt.logging.success("✅ Set Weights on chain successfully!")
-                self.blocks_since_last_update = 0
-            else:
-                bt.logging.debug(
-                    "Failed to set weights this iteration with message:",
-                    msg,
+            try:
+                (
+                    uint_uids,
+                    uint_weights,
+                ) = bt.utils.weight_utils.convert_weights_and_uids_for_emit(uids=uids, weights=array(weights))
+            except Exception as e:
+                bt.logging.error(f"Failed to convert weights for emit: {e}", exc_info=True)
+                return
+
+            try:
+                result, msg = self.subtensor.set_weights(
+                    netuid=self.config.netuid,
+                    wallet=self.wallet,
+                    uids=uint_uids,
+                    weights=uint_weights,
+                    wait_for_inclusion=True,
+                    version_key=__spec_version__,
                 )
+                if result:
+                    bt.logging.success("✅ Set Weights on chain successfully!")
+                    self.blocks_since_last_update = 0
+                else:
+                    bt.logging.debug(
+                        "Failed to set weights this iteration with message:",
+                        msg,
+                    )
+            except Exception as e:
+                bt.logging.error(f"Failed to set weights on chain: {e}", exc_info=True)
 
     async def scheduled_prediction_request(self):
         if not hasattr(self, "timestamp"):
@@ -291,24 +297,39 @@ class weight_setter:
         bt.logging.info("Loading validator state.")
         bt.logging.info(f"State path: {state_path}")
 
-        # Attempt to load validator state
         try:
             with open(state_path, "rb") as f:
                 state = pickle.load(f)
 
-        # If we fail to load the state, initialize the state
+            if not isinstance(state, dict):
+                raise ValueError("State is not a dictionary")
+
+            required_keys = ["scores", "MinerHistory", "moving_average_scores"]
+            missing_keys = [key for key in required_keys if key not in state]
+            if missing_keys:
+                raise ValueError(f"State missing required keys: {missing_keys}")
+
+            if not isinstance(state["MinerHistory"], dict):
+                raise ValueError("MinerHistory is not a dictionary")
+
+            for uid, history in state["MinerHistory"].items():
+                if not isinstance(history, MinerHistory):
+                    raise ValueError(f"Invalid MinerHistory object for UID {uid}")
+                if not hasattr(history, "predictions") or not hasattr(history, "intervals"):
+                    raise ValueError(f"MinerHistory for UID {uid} missing predictions or intervals")
+
+            self.scores = state["scores"]
+            self.MinerHistory = state["MinerHistory"]
+            self.moving_average_scores = state["moving_average_scores"]
+
+            bt.logging.success(f"Successfully loaded and validated state for {len(self.MinerHistory)} miners")
+
         except Exception as e:
-            bt.logging.error(f"Failed to load state with error: {e}")
+            bt.logging.error(f"Failed to load or validate state: {e}. Initializing fresh state.")
 
             self.scores = [0.0] * len(self.metagraph.S)
             self.moving_average_scores = {uid: 0 for uid in self.metagraph.uids}
             self.MinerHistory = {uid: MinerHistory(uid, timezone=self.timezone) for uid in range(len(self.metagraph.S))}
-
-        # If we successfully loaded the file, then load the state
-        else:
-            self.scores = state["scores"]
-            self.MinerHistory = state["MinerHistory"]
-            self.moving_average_scores = state["moving_average_scores"]
 
         # Regardless log this text
         finally:

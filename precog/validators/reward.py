@@ -12,7 +12,7 @@ from precog.utils.timestamp import get_before, to_datetime, to_str
 
 
 ################################################################################
-def calc_rewards(
+def calc_rewards(  # noqa: C901
     self,
     responses: List[Challenge],
 ) -> np.ndarray:
@@ -134,11 +134,41 @@ def calc_rewards(
 
         bt.logging.debug(f"UID: {uid} | point_errors: {point_errors[-1]} | interval_scores: {interval_scores[-1]}")
 
-    point_ranks = rank(np.array(point_errors))
-    interval_ranks = rank(-np.array(interval_scores))  # 1 is best, 0 is worst, so flip it
+    point_errors_array = np.array(point_errors)
+    interval_scores_array = np.array(interval_scores)
 
-    point_weights = get_average_weights_for_ties(point_ranks, decay)
-    interval_weights = get_average_weights_for_ties(interval_ranks, decay)
+    if len(point_errors_array) == 0:
+        bt.logging.warning("No point errors to rank, returning zero rewards")
+        return np.zeros(len(self.available_uids))
+
+    if np.all(np.isinf(point_errors_array)):
+        bt.logging.warning("All miners have infinite point errors (no predictions), using equal weights")
+        point_ranks = np.ones(len(point_errors_array))
+    else:
+        point_ranks = rank(point_errors_array)
+
+    if np.all(interval_scores_array == 0):
+        bt.logging.warning("All miners have zero interval scores, using equal weights")
+        interval_ranks = np.ones(len(interval_scores_array))
+    else:
+        interval_ranks = rank(-interval_scores_array)  # 1 is best, 0 is worst, so flip it
+
+    try:
+        point_weights = get_average_weights_for_ties(point_ranks, decay)
+        interval_weights = get_average_weights_for_ties(interval_ranks, decay)
+    except Exception as e:
+        bt.logging.error(f"Error calculating weights from ranks: {e}", exc_info=True)
+        owner_weights = np.zeros(len(self.available_uids))
+
+        owner_hotkey = self.subtensor.get_subnet_owner_hotkey(self.config.netuid)
+        owner_uid = self.metagraph.hotkeys.index(owner_hotkey)
+        if owner_uid in self.available_uids:
+            owner_idx = self.available_uids.index(owner_uid)
+            owner_weights[owner_idx] = 1.0
+            bt.logging.info(f"Setting all weight to subnet owner UID {owner_uid}")
+
+        point_weights = owner_weights
+        interval_weights = owner_weights
     bt.logging.trace(f"point_weights: {point_weights}")
     bt.logging.trace(f"interval_weights: {point_weights}")
 

@@ -9,6 +9,8 @@ class MinerHistory:
     Allows for easy formatting, filtering, and lookup of predictions by timestamp.
     """
 
+    MAX_HISTORY_SIZE = 500
+
     def __init__(self, uid: int, timezone=get_timezone()):
         self.predictions = {}
         self.intervals = {}
@@ -19,10 +21,26 @@ class MinerHistory:
         if isinstance(timestamp, str):
             timestamp = to_datetime(timestamp)
         timestamp = round_minute_down(timestamp)
+
         if prediction is not None:
+            if not isinstance(prediction, (int, float)) or not (-1e10 < prediction < 1e10):
+                return
             self.predictions[timestamp] = prediction
+
+            if len(self.predictions) > self.MAX_HISTORY_SIZE:
+                oldest_timestamp = min(self.predictions.keys())
+                del self.predictions[oldest_timestamp]
+
         if interval is not None:
+            if not isinstance(interval, list) or len(interval) != 2:
+                return
+            if not all(isinstance(x, (int, float)) and -1e10 < x < 1e10 for x in interval):
+                return
             self.intervals[timestamp] = interval
+
+            if len(self.intervals) > self.MAX_HISTORY_SIZE:
+                oldest_timestamp = min(self.intervals.keys())
+                del self.intervals[oldest_timestamp]
 
     def clear_old_predictions(self):
         # deletes predictions older than 24 hours

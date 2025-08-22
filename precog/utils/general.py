@@ -83,19 +83,38 @@ def get_average_weights_for_ties(ranks, decay):
 
 
 async def loop_handler(self, func: Callable, sleep_time: float = 120):
+    consecutive_errors = 0
+    max_consecutive_errors = 5
+
     try:
         while not self.stop_event.is_set():
-            async with self.lock:
-                await func()
+            try:
+                async with self.lock:
+                    await func()
+                consecutive_errors = 0
+            except Exception as e:
+                consecutive_errors += 1
+                bt.logging.error(
+                    f"{func.__name__} raised error ({consecutive_errors}/{max_consecutive_errors}): {e}", exc_info=True
+                )
+
+                if consecutive_errors >= max_consecutive_errors:
+                    bt.logging.critical(
+                        f"{func.__name__} failed {max_consecutive_errors} times in a row, stopping loop"
+                    )
+                    break
+
+                backoff_time = min(60 * (2**consecutive_errors), 600)
+                bt.logging.info(f"Backing off for {backoff_time} seconds before retrying {func.__name__}")
+                await asyncio.sleep(backoff_time)
+                continue
+
             await asyncio.sleep(sleep_time)
     except asyncio.CancelledError:
         bt.logging.error(f"{func.__name__} cancelled")
         raise
     except KeyboardInterrupt:
         raise
-    except Exception as e:
-        bt.logging.error(f"{func.__name__} raised error: {e}")
-        raise e
     finally:
         async with self.lock:
             self.stop_event.set()
