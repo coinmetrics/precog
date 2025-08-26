@@ -16,11 +16,28 @@ def _calculate_interval_score(prediction_time, eval_time, interval_bounds, cm_da
     hour_prices = []
     items_checked = 0
 
+    # Debug: Log first timestamp to see format mismatch
+    if uid == 30 and cm_data:  # Only for UID 30
+        first_key = list(cm_data.keys())[0]
+        last_key = list(cm_data.keys())[-1]
+        bt.logging.info(f"UID {uid} interval debug:")
+        bt.logging.info(f"  prediction_time: {prediction_time} (type: {type(prediction_time).__name__})")
+        bt.logging.info(f"  eval_time: {eval_time} (type: {type(eval_time).__name__})")
+        bt.logging.info(f"  First cm_data key: {first_key}")
+        bt.logging.info(f"  Last cm_data key: {last_key}")
+        bt.logging.info(f"  Total entries in cm_data: {len(cm_data)}")
+
     for price_time, price_value in cm_data.items():
         items_checked += 1
 
         if prediction_time <= price_time <= eval_time:
             hour_prices.append(price_value)
+            # Log first match for debugging
+            if uid == 30 and len(hour_prices) == 1:
+                bt.logging.info(f"  First matching price: time={price_time}, value={price_value}")
+
+    if uid == 30:
+        bt.logging.info(f"  Total prices found in range: {len(hour_prices)} out of {items_checked} checked")
 
     if not hour_prices:
         return 0
@@ -44,7 +61,20 @@ def _calculate_interval_score(prediction_time, eval_time, interval_bounds, cm_da
     prices_in_bounds = sum(1 for price in hour_prices if pred_min <= price <= pred_max)
     inclusion_factor = prices_in_bounds / len(hour_prices)
 
-    return inclusion_factor * width_factor
+    final_score = inclusion_factor * width_factor
+
+    # Debug logging for UID 30
+    if uid == 30:
+        bt.logging.info(
+            f"  Interval calc: pred_range=[{pred_min:.2f}, {pred_max:.2f}], observed_range=[{observed_min:.2f}, {observed_max:.2f}]"
+        )
+        bt.logging.info(f"  Interval calc: effective_range=[{effective_bottom:.2f}, {effective_top:.2f}]")
+        bt.logging.info(f"  Interval calc: width_factor={width_factor:.4f}, inclusion_factor={inclusion_factor:.4f}")
+        bt.logging.info(
+            f"  Interval calc: prices_in_bounds={prices_in_bounds}/{len(hour_prices)}, final_score={final_score:.4f}"
+        )
+
+    return final_score
 
 
 def _process_asset_predictions(
@@ -65,16 +95,27 @@ def _process_asset_predictions(
                 actual_price = cm_data[eval_time]
                 current_point_error = abs(prediction_value - actual_price) / actual_price
                 asset_point_errors[asset].append(current_point_error)
+                bt.logging.info(
+                    f"UID: {uid} | {asset} | Point prediction: {prediction_value:.2f} | Actual: {actual_price:.2f} | Error: {current_point_error:.4f}"
+                )
 
         # Handle interval predictions
         if not response.intervals or asset not in response.intervals:
             asset_interval_scores[asset].append(0)
+            bt.logging.info(f"UID: {uid} | {asset} | No interval prediction (intervals={response.intervals})")
         else:
             interval_bounds = response.intervals[asset]
+            bt.logging.info(f"UID: {uid} | {asset} | Processing interval bounds: {interval_bounds}")
             interval_score_value = _calculate_interval_score(
                 prediction_time, eval_time, interval_bounds, cm_data, uid=uid
             )
             asset_interval_scores[asset].append(interval_score_value)
+            if interval_score_value > 0:
+                bt.logging.info(
+                    f"UID: {uid} | {asset} | Interval: [{min(interval_bounds):.2f}, {max(interval_bounds):.2f}] | Score: {interval_score_value:.4f}"
+                )
+            else:
+                bt.logging.info(f"UID: {uid} | {asset} | Interval score: 0 (no price data)")
 
 
 def calc_rewards(  # noqa: C901
@@ -88,7 +129,7 @@ def calc_rewards(  # noqa: C901
     asset_interval_scores = {}
     decay = 0.8
     timestamp = responses[0].timestamp
-    bt.logging.debug(f"Calculating rewards for timestamp: {timestamp}")
+    bt.logging.info(f"Calculating rewards for timestamp: {timestamp}")
     cm = CMData()
 
     # Current evaluation time and when prediction was made
