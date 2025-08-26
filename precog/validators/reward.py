@@ -61,20 +61,7 @@ def _calculate_interval_score(prediction_time, eval_time, interval_bounds, cm_da
     prices_in_bounds = sum(1 for price in hour_prices if pred_min <= price <= pred_max)
     inclusion_factor = prices_in_bounds / len(hour_prices)
 
-    final_score = inclusion_factor * width_factor
-
-    # Debug logging for UID 30
-    if uid == 30:
-        bt.logging.info(
-            f"  Interval calc: pred_range=[{pred_min:.2f}, {pred_max:.2f}], observed_range=[{observed_min:.2f}, {observed_max:.2f}]"
-        )
-        bt.logging.info(f"  Interval calc: effective_range=[{effective_bottom:.2f}, {effective_top:.2f}]")
-        bt.logging.info(f"  Interval calc: width_factor={width_factor:.4f}, inclusion_factor={inclusion_factor:.4f}")
-        bt.logging.info(
-            f"  Interval calc: prices_in_bounds={prices_in_bounds}/{len(hour_prices)}, final_score={final_score:.4f}"
-        )
-
-    return final_score
+    return inclusion_factor * width_factor
 
 
 def _process_asset_predictions(

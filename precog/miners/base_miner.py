@@ -112,7 +112,7 @@ def get_prediction_interval(
     except Exception as e:
         bt.logging.error(f"Error calculating interval for {asset}: {e}")
         # Emergency fallback: ±3% interval
-        margin = point_estimate * 0.03
+        margin = point_estimate * 0.10  # Increased from 3% to 10% for better coverage
         return point_estimate - margin, point_estimate + margin
 
 
