@@ -16,61 +16,13 @@ def _calculate_interval_score(prediction_time, eval_time, interval_bounds, cm_da
     hour_prices = []
     items_checked = 0
 
-    # Debug: Check the first few iterations to see what's happening (only for UIDs 8 and 30)
-    debug_enabled = uid in [8, 30]
-    debug_first_items = 5
-    debug_count = 0
-
     for price_time, price_value in cm_data.items():
         items_checked += 1
 
-        # Debug first few items for specific UIDs only
-        if debug_enabled and debug_count < debug_first_items:
-            in_range = prediction_time <= price_time <= eval_time
-            bt.logging.debug(
-                f"_calculate_interval_score item {debug_count}: "
-                f"time={price_time}, value={price_value:.2f}, "
-                f"in_range={in_range}"
-            )
-            if not in_range:
-                bt.logging.debug(f"  Range check details: pred={prediction_time} <= {price_time} <= eval={eval_time}")
-                bt.logging.debug(
-                    f"  pred <= price: {prediction_time <= price_time}, " f"price <= eval: {price_time <= eval_time}"
-                )
-            debug_count += 1
-
-        in_range_actual = prediction_time <= price_time <= eval_time
-        if in_range_actual:
+        if prediction_time <= price_time <= eval_time:
             hour_prices.append(price_value)
-            if debug_enabled and debug_count <= 5:
-                bt.logging.debug(f"_calculate_interval_score UID {uid}: Added price {price_value} at {price_time}")
-        elif debug_enabled and debug_count <= 5:
-            bt.logging.debug(f"_calculate_interval_score UID {uid}: REJECTED price {price_value} at {price_time}")
-
-    if debug_enabled:
-        bt.logging.debug(f"_calculate_interval_score UID {uid}: Found {len(hour_prices)} prices in range")
 
     if not hour_prices:
-        if debug_enabled:
-            bt.logging.debug(f"_calculate_interval_score UID {uid}: Checked {items_checked} items, found 0 in range")
-            bt.logging.debug(
-                f"_calculate_interval_score UID {uid}: prediction_time type: {type(prediction_time)}, value: {prediction_time}"
-            )
-            bt.logging.debug(
-                f"_calculate_interval_score UID {uid}: eval_time type: {type(eval_time)}, value: {eval_time}"
-            )
-
-            # Check if the times are in cm_data
-            if prediction_time in cm_data:
-                bt.logging.debug(f"_calculate_interval_score UID {uid}: prediction_time IS in cm_data")
-            else:
-                bt.logging.debug(f"_calculate_interval_score UID {uid}: prediction_time NOT in cm_data")
-
-            if eval_time in cm_data:
-                bt.logging.debug(f"_calculate_interval_score UID {uid}: eval_time IS in cm_data")
-            else:
-                bt.logging.debug(f"_calculate_interval_score UID {uid}: eval_time NOT in cm_data")
-
         return 0
 
     pred_min = min(interval_bounds)
@@ -102,46 +54,27 @@ def _process_asset_predictions(
     for asset in assets:
         cm_data = all_cm_data[asset]
 
-        # Debug logging for UIDs 8 and 30
-        if uid in [8, 30]:
-            bt.logging.debug(f"UID {uid} | {asset} | cm_data has {len(cm_data)} entries")
-
         # Handle point predictions
         if not response.predictions or asset not in response.predictions:
             asset_point_errors[asset].append(np.inf)
-            bt.logging.debug(f"UID: {uid} | {asset} | No prediction provided")
         else:
             prediction_value = response.predictions[asset]
             if eval_time not in cm_data:
                 asset_point_errors[asset].append(np.inf)
-                bt.logging.debug(f"UID: {uid} | {asset} | No price data at {eval_time}")
             else:
                 actual_price = cm_data[eval_time]
                 current_point_error = abs(prediction_value - actual_price) / actual_price
                 asset_point_errors[asset].append(current_point_error)
-                bt.logging.debug(
-                    f"UID: {uid} | {asset} | Prediction: {prediction_value} | Actual: {actual_price} | Error: {current_point_error}"
-                )
 
         # Handle interval predictions
         if not response.intervals or asset not in response.intervals:
             asset_interval_scores[asset].append(0)
-            bt.logging.debug(f"UID: {uid} | {asset} | No interval prediction provided")
         else:
             interval_bounds = response.intervals[asset]
             interval_score_value = _calculate_interval_score(
                 prediction_time, eval_time, interval_bounds, cm_data, uid=uid
             )
             asset_interval_scores[asset].append(interval_score_value)
-
-            if interval_score_value > 0:
-                pred_min = min(interval_bounds)
-                pred_max = max(interval_bounds)
-                bt.logging.debug(
-                    f"UID: {uid} | {asset} | Interval: [{pred_min}, {pred_max}] | Score: {interval_score_value:.3f}"
-                )
-            else:
-                bt.logging.debug(f"UID: {uid} | {asset} | No price data for interval evaluation")
 
 
 def calc_rewards(  # noqa: C901
@@ -187,26 +120,8 @@ def calc_rewards(  # noqa: C901
         for asset in assets:
             asset_data = historical_price_data[historical_price_data["asset"] == asset]
             if not asset_data.empty:
-                bt.logging.info(
-                    f"Asset {asset}: DataFrame shape={asset_data.shape}, index={list(asset_data.index[:5])}, columns={list(asset_data.columns)}"
-                )
-                # Debug: Check DataFrame time range before conversion
-                bt.logging.debug(
-                    f"Asset {asset} DataFrame time range: {asset_data['time'].min()} to {asset_data['time'].max()}"
-                )
-                bt.logging.debug(f"Asset {asset} DataFrame has {len(asset_data)} rows")
-
                 all_cm_data[asset] = pd_to_dict(asset_data)  # noqa
                 bt.logging.info(f"CM data fetched for {asset}: {len(all_cm_data[asset])} price points")
-
-                # Debug: Verify dict has expected entries
-                dict_times = list(all_cm_data[asset].keys())
-                if dict_times:
-                    bt.logging.debug(f"Asset {asset} dict time range: {min(dict_times)} to {max(dict_times)}")
-                    if len(dict_times) != len(asset_data):
-                        bt.logging.warning(
-                            f"Asset {asset}: DataFrame had {len(asset_data)} rows but dict has {len(dict_times)} entries!"
-                        )
             else:
                 all_cm_data[asset] = {}
                 bt.logging.warning(f"No CM data returned for {asset}")
@@ -220,35 +135,14 @@ def calc_rewards(  # noqa: C901
         asset_point_errors[asset] = []
         asset_interval_scores[asset] = []
 
-    # Debug: Log initial all_cm_data state
-    bt.logging.debug("Initial all_cm_data sizes after fetching:")
-    for asset in assets:
-        bt.logging.debug(f"  {asset}: {len(all_cm_data[asset])} entries, id: {id(all_cm_data[asset])}")
-
     for uid, response in zip(self.available_uids, responses):
         # Store multi-asset predictions in MinerHistory
         self.MinerHistory[uid].add_prediction(response.timestamp, response.predictions, response.intervals)
-
-        # Debug logging for specific UIDs
-        if uid in [8, 30]:
-            bt.logging.debug(f"UID {uid} - Before processing, all_cm_data sizes:")
-            for asset in assets:
-                bt.logging.debug(f"  {asset}: {len(all_cm_data[asset])} entries")
-                if len(all_cm_data[asset]) <= 5:
-                    bt.logging.debug(f"    Keys: {list(all_cm_data[asset].keys())}")
 
         # Process all asset predictions for this miner
         _process_asset_predictions(
             uid, response, assets, all_cm_data, eval_time, asset_point_errors, asset_interval_scores, prediction_time
         )
-
-        # Debug logging after processing
-        if uid in [8, 30]:
-            bt.logging.debug(f"UID {uid} - After processing, all_cm_data sizes:")
-            for asset in assets:
-                bt.logging.debug(f"  {asset}: {len(all_cm_data[asset])} entries")
-                if len(all_cm_data[asset]) <= 5:
-                    bt.logging.debug(f"    Keys: {list(all_cm_data[asset].keys())}")
 
     # Score, rank, and weight each task independently
     task_weights = {}
