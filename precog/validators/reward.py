@@ -117,7 +117,9 @@ def _process_asset_predictions(
                     f"UID: {uid} | {asset} | Interval: [{min(interval_bounds):.2f}, {max(interval_bounds):.2f}] | Score: {interval_score_value:.4f}"
                 )
             else:
-                bt.logging.info(f"UID: {uid} | {asset} | Interval score: 0 (no price data)")
+                bt.logging.info(
+                    f"UID: {uid} | {asset} | Interval: [{min(interval_bounds):.2f}, {max(interval_bounds):.2f}] | Score: 0 (no overlap with observed prices)"
+                )
 
 
 def calc_rewards(  # noqa: C901

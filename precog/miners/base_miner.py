@@ -69,9 +69,9 @@ def get_prediction_interval(
         )
 
         if historical_price_data.empty or len(historical_price_data) < 24:
-            bt.logging.warning(f"Insufficient data for {asset}, using conservative fallback interval")
-            # Conservative fallback: ±5% of point estimate
-            margin = point_estimate * 0.05
+            bt.logging.warning(f"Insufficient data for {asset}, using fallback interval")
+            # Fallback: ±10% of point estimate (increased from 5%)
+            margin = point_estimate * 0.10
             return point_estimate - margin, point_estimate + margin
 
         # Calculate hourly returns (percentage changes)
@@ -85,20 +85,21 @@ def get_prediction_interval(
         clean_returns = hourly_returns[outlier_mask]
 
         if len(clean_returns) < 12:
-            bt.logging.warning(f"Too few clean data points for {asset}, using conservative fallback")
-            margin = point_estimate * 0.05
+            bt.logging.warning(f"Too few clean data points for {asset}, using fallback")
+            margin = point_estimate * 0.10  # Increased from 5%
             return point_estimate - margin, point_estimate + margin
 
         # Use standard deviation of hourly returns for 1-hour prediction
         hourly_vol = float(clean_returns.std())
 
-        # For 90% prediction interval, use 1.64 standard deviations
-        # Convert percentage volatility back to price terms
-        margin = point_estimate * hourly_vol * 1.64
+        # Use a wider confidence interval for better coverage
+        # 2.58 standard deviations = 99% confidence interval
+        # This provides much better coverage for all assets
+        margin = point_estimate * hourly_vol * 2.58
 
-        # Apply reasonable bounds to prevent unrealistic intervals
-        max_margin = point_estimate * 0.15  # Cap at ±15%
-        min_margin = point_estimate * 0.01  # Minimum ±1%
+        # Increase bounds to be more generous for all assets
+        max_margin = point_estimate * 0.30  # Cap at ±30% (increased from 15%)
+        min_margin = point_estimate * 0.02  # Minimum ±2% (increased from 1%)
 
         margin = max(min_margin, min(margin, max_margin))
 
@@ -111,8 +112,8 @@ def get_prediction_interval(
 
     except Exception as e:
         bt.logging.error(f"Error calculating interval for {asset}: {e}")
-        # Emergency fallback: ±3% interval
-        margin = point_estimate * 0.10  # Increased from 3% to 10% for better coverage
+        # Emergency fallback: ±15% interval for better coverage
+        margin = point_estimate * 0.15  # Increased to 15% for better coverage
         return point_estimate - margin, point_estimate + margin
 
 
