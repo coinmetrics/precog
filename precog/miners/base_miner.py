@@ -40,6 +40,7 @@ def get_point_estimate(cm: CMData, timestamp: str, asset: str = "btc") -> float:
     asset_price: float = float(price_data["ReferenceRateUSD"].iloc[-1])
 
     # Return the current price of the asset as our point estimate
+    bt.logging.info(f"Point estimate for {asset} at {provided_timestamp}: ${asset_price:.2f} (from CM API)")
     return asset_price
 
 

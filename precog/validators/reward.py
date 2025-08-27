@@ -105,7 +105,7 @@ def _process_asset_predictions(
                     current_point_error = abs(prediction_value - actual_price) / actual_price
                     asset_point_errors[asset].append(current_point_error)
                     bt.logging.info(
-                        f"UID: {uid} | {asset} | Point prediction: {prediction_value:.2f} | Actual: {actual_price:.2f} | Error: {current_point_error:.4f}"
+                        f"UID: {uid} | {asset} | POINT: Prediction made at {prediction_time} was {prediction_value:.2f} | Actual at {eval_time} is {actual_price:.2f} | Error: {current_point_error:.4f}"
                     )
 
         if prediction_time not in current_miner.intervals:
@@ -119,7 +119,10 @@ def _process_asset_predictions(
                 bt.logging.debug(f"UID: {uid} | {asset} | No interval prediction for asset")
             else:
                 interval_bounds = stored_intervals[asset]
-                bt.logging.info(f"UID: {uid} | {asset} | Processing interval bounds: {interval_bounds}")
+                bt.logging.info(
+                    f"UID: {uid} | {asset} | INTERVAL: Evaluating interval predicted at {prediction_time} for period [{prediction_time} to {eval_time}]"
+                )
+                bt.logging.info(f"UID: {uid} | {asset} | INTERVAL: Predicted bounds: {interval_bounds}")
                 interval_score_value = _calculate_interval_score(
                     prediction_time, eval_time, interval_bounds, cm_data, uid=uid
                 )
