@@ -80,38 +80,50 @@ def _calculate_interval_score(prediction_time, eval_time, interval_bounds, cm_da
 
 
 def _process_asset_predictions(
-    uid, response, assets, all_cm_data, eval_time, asset_point_errors, asset_interval_scores, prediction_time
+    uid, current_miner, assets, all_cm_data, eval_time, asset_point_errors, asset_interval_scores, prediction_time
 ):
     """Process predictions for all assets for a single miner."""
     for asset in assets:
         cm_data = all_cm_data[asset]
 
-        # Handle point predictions
-        if not response.predictions or asset not in response.predictions:
+        if prediction_time not in current_miner.predictions:
             asset_point_errors[asset].append(np.inf)
+            bt.logging.debug(f"UID: {uid} | {asset} | No prediction found at {prediction_time}")
         else:
-            prediction_value = response.predictions[asset]
-            if eval_time not in cm_data:
-                asset_point_errors[asset].append(np.inf)
-            else:
-                actual_price = cm_data[eval_time]
-                current_point_error = abs(prediction_value - actual_price) / actual_price
-                asset_point_errors[asset].append(current_point_error)
-                bt.logging.info(
-                    f"UID: {uid} | {asset} | Point prediction: {prediction_value:.2f} | Actual: {actual_price:.2f} | Error: {current_point_error:.4f}"
-                )
+            stored_predictions = current_miner.predictions[prediction_time]
 
-        # Handle interval predictions
-        if not response.intervals or asset not in response.intervals:
+            if not stored_predictions or asset not in stored_predictions:
+                asset_point_errors[asset].append(np.inf)
+                bt.logging.debug(f"UID: {uid} | {asset} | No point prediction for asset")
+            else:
+                prediction_value = stored_predictions[asset]
+                if eval_time not in cm_data:
+                    asset_point_errors[asset].append(np.inf)
+                    bt.logging.debug(f"UID: {uid} | {asset} | No price data at {eval_time}")
+                else:
+                    actual_price = cm_data[eval_time]
+                    current_point_error = abs(prediction_value - actual_price) / actual_price
+                    asset_point_errors[asset].append(current_point_error)
+                    bt.logging.info(
+                        f"UID: {uid} | {asset} | Point prediction: {prediction_value:.2f} | Actual: {actual_price:.2f} | Error: {current_point_error:.4f}"
+                    )
+
+        if prediction_time not in current_miner.intervals:
             asset_interval_scores[asset].append(0)
-            bt.logging.info(f"UID: {uid} | {asset} | No interval prediction (intervals={response.intervals})")
+            bt.logging.debug(f"UID: {uid} | {asset} | No interval prediction found at {prediction_time}")
         else:
-            interval_bounds = response.intervals[asset]
-            bt.logging.info(f"UID: {uid} | {asset} | Processing interval bounds: {interval_bounds}")
-            interval_score_value = _calculate_interval_score(
-                prediction_time, eval_time, interval_bounds, cm_data, uid=uid
-            )
-            asset_interval_scores[asset].append(interval_score_value)
+            stored_intervals = current_miner.intervals[prediction_time]
+
+            if not stored_intervals or asset not in stored_intervals:
+                asset_interval_scores[asset].append(0)
+                bt.logging.debug(f"UID: {uid} | {asset} | No interval prediction for asset")
+            else:
+                interval_bounds = stored_intervals[asset]
+                bt.logging.info(f"UID: {uid} | {asset} | Processing interval bounds: {interval_bounds}")
+                interval_score_value = _calculate_interval_score(
+                    prediction_time, eval_time, interval_bounds, cm_data, uid=uid
+                )
+                asset_interval_scores[asset].append(interval_score_value)
             if interval_score_value > 0:
                 bt.logging.info(
                     f"UID: {uid} | {asset} | Interval: [{min(interval_bounds):.2f}, {max(interval_bounds):.2f}] | Score: {interval_score_value:.4f}"
@@ -181,12 +193,18 @@ def calc_rewards(  # noqa: C901
         asset_interval_scores[asset] = []
 
     for uid, response in zip(self.available_uids, responses):
-        # Store multi-asset predictions in MinerHistory
+        current_miner = self.MinerHistory[uid]
         self.MinerHistory[uid].add_prediction(response.timestamp, response.predictions, response.intervals)
 
-        # Process all asset predictions for this miner
         _process_asset_predictions(
-            uid, response, assets, all_cm_data, eval_time, asset_point_errors, asset_interval_scores, prediction_time
+            uid,
+            current_miner,
+            assets,
+            all_cm_data,
+            eval_time,
+            asset_point_errors,
+            asset_interval_scores,
+            prediction_time,
         )
 
     # Score, rank, and weight each task independently
