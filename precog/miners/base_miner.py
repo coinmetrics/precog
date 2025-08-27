@@ -86,7 +86,7 @@ async def forward_async(synapse: Challenge, cm: CMData) -> Challenge:
 
     # Get timestamps for data fetch
     provided_timestamp = to_datetime(synapse.timestamp)
-    start_timestamp = get_before(synapse.timestamp, hours=24, minutes=0, seconds=0)  # 24 hours for volatility calc
+    start_timestamp = get_before(synapse.timestamp, hours=1, minutes=0, seconds=0)  # 1 hour - sufficient for volatility
 
     # Fetch ALL data we need in a single API call
     all_data = cm.get_CM_ReferenceRate(
@@ -94,7 +94,6 @@ async def forward_async(synapse: Challenge, cm: CMData) -> Challenge:
         start=to_str(start_timestamp),
         end=to_str(provided_timestamp),
         frequency="1s",
-        use_cache=False,
     )
 
     predictions = {}
@@ -118,6 +117,11 @@ async def forward_async(synapse: Challenge, cm: CMData) -> Challenge:
 
                 predictions[asset] = point_estimate
                 intervals[asset] = list(interval)
+
+                # Log the complete prediction for this asset
+                bt.logging.info(
+                    f"{asset}: Prediction=${point_estimate:.2f} | Interval=[${interval[0]:.2f}, ${interval[1]:.2f}]"
+                )
             else:
                 bt.logging.warning(f"No data for {asset} in response")
 
