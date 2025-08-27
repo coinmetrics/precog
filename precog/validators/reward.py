@@ -47,6 +47,13 @@ def _calculate_interval_score(prediction_time, eval_time, interval_bounds, cm_da
     observed_min = min(hour_prices)
     observed_max = max(hour_prices)
 
+    # Debug logging for interval evaluation
+    if uid == 30:
+        bt.logging.info(f"  Interval evaluation for UID {uid}:")
+        bt.logging.info(f"    Predicted interval: [{pred_min:.2f}, {pred_max:.2f}]")
+        bt.logging.info(f"    Observed min/max: [{observed_min:.2f}, {observed_max:.2f}]")
+        bt.logging.info(f"    Number of prices in hour: {len(hour_prices)}")
+
     # Calculate effective top and bottom
     effective_top = min(pred_max, observed_max)
     effective_bottom = max(pred_min, observed_min)
@@ -60,6 +67,14 @@ def _calculate_interval_score(prediction_time, eval_time, interval_bounds, cm_da
     # Calculate inclusion factor (f_i)
     prices_in_bounds = sum(1 for price in hour_prices if pred_min <= price <= pred_max)
     inclusion_factor = prices_in_bounds / len(hour_prices)
+
+    # Debug logging for score calculation
+    if uid == 30:
+        bt.logging.info(f"    Effective top/bottom: [{effective_bottom:.2f}, {effective_top:.2f}]")
+        bt.logging.info(f"    Width factor (f_w): {width_factor:.4f}")
+        bt.logging.info(f"    Prices in predicted bounds: {prices_in_bounds}/{len(hour_prices)}")
+        bt.logging.info(f"    Inclusion factor (f_i): {inclusion_factor:.4f}")
+        bt.logging.info(f"    Final interval score: {inclusion_factor * width_factor:.4f}")
 
     return inclusion_factor * width_factor
 
