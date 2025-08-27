@@ -110,6 +110,10 @@ class TestReward(unittest.TestCase):
                 )
             )
 
+            # Pre-populate MinerHistory with predictions from 1 hour ago
+            # The reward calculation expects to find predictions at prediction_time
+            self.mock_validator.MinerHistory[uid].add_prediction(to_str(self.prediction_time), predictions, intervals)
+
         # Calculate rewards
         rewards = calc_rewards(self.mock_validator, responses)
 
@@ -180,6 +184,10 @@ class TestReward(unittest.TestCase):
                     intervals=intervals,
                 )
             )
+
+            # Pre-populate MinerHistory with predictions from 1 hour ago
+            # The reward calculation expects to find predictions at prediction_time
+            self.mock_validator.MinerHistory[uid].add_prediction(to_str(self.prediction_time), predictions, intervals)
 
         # Calculate rewards
         rewards = calc_rewards(self.mock_validator, responses)
