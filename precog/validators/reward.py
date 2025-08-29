@@ -56,47 +56,35 @@ def _process_asset_predictions(
 
         if prediction_time not in current_miner.predictions:
             asset_point_errors[asset].append(np.inf)
-            bt.logging.debug(f"UID: {uid} | {asset} | No prediction found at {prediction_time}")
         else:
             stored_predictions = current_miner.predictions[prediction_time]
 
             if not stored_predictions or asset not in stored_predictions:
                 asset_point_errors[asset].append(np.inf)
-                bt.logging.debug(f"UID: {uid} | {asset} | No point prediction for asset")
             else:
                 prediction_value = stored_predictions[asset]
                 if eval_time not in cm_data:
                     asset_point_errors[asset].append(np.inf)
-                    bt.logging.debug(f"UID: {uid} | {asset} | No price data at {eval_time}")
                 else:
                     actual_price = cm_data[eval_time]
                     current_point_error = abs(prediction_value - actual_price) / actual_price
                     asset_point_errors[asset].append(current_point_error)
-                    bt.logging.debug(
-                        f"UID: {uid} | {asset} | POINT: Prediction made at {prediction_time} was {prediction_value:.2f} | Actual at {eval_time} is {actual_price:.2f} | Error: {current_point_error:.4f}"
-                    )
+                    bt.logging.debug(f"UID: {uid} | {asset} | Point error: {current_point_error:.4f}")
 
         if prediction_time not in current_miner.intervals:
             asset_interval_scores[asset].append(0)
-            bt.logging.debug(f"UID: {uid} | {asset} | No interval prediction found at {prediction_time}")
         else:
             stored_intervals = current_miner.intervals[prediction_time]
 
             if not stored_intervals or asset not in stored_intervals:
                 asset_interval_scores[asset].append(0)
-                bt.logging.debug(f"UID: {uid} | {asset} | No interval prediction for asset")
             else:
                 interval_bounds = stored_intervals[asset]
-                bt.logging.debug(
-                    f"UID: {uid} | {asset} | INTERVAL: Evaluating interval predicted at {prediction_time} for period [{prediction_time} to {eval_time}] | Predicted bounds: {interval_bounds}"
-                )
                 interval_score_value = _calculate_interval_score(
                     prediction_time, eval_time, interval_bounds, cm_data, uid=uid
                 )
                 asset_interval_scores[asset].append(interval_score_value)
-                bt.logging.debug(
-                    f"UID: {uid} | {asset} | Interval: [{min(interval_bounds):.2f}, {max(interval_bounds):.2f}] | Score: {interval_score_value:.4f}"
-                )
+                bt.logging.debug(f"UID: {uid} | {asset} | Interval score: {interval_score_value:.4f}")
 
 
 def calc_rewards(  # noqa: C901
@@ -110,14 +98,11 @@ def calc_rewards(  # noqa: C901
     asset_interval_scores = {}
     decay = 0.8
     timestamp = responses[0].timestamp
-    bt.logging.debug(f"Calculating rewards for timestamp: {timestamp}")
     cm = CMData()
 
     # Current evaluation time and when prediction was made
     eval_time = to_datetime(timestamp)
     prediction_time = get_before(timestamp=timestamp, hours=prediction_future_hours, minutes=0)
-
-    bt.logging.debug(f"Evaluating predictions made at {prediction_time} for period ending at {eval_time}")
 
     # Get price data for the past hour (the hour that was predicted)
     # Miners predicted at prediction_time for the period [prediction_time, eval_time]
@@ -128,7 +113,6 @@ def calc_rewards(  # noqa: C901
     assets = responses[0].assets
 
     # Fetch price data for all assets in one API call
-    bt.logging.debug(f"Fetching CM data from {start_time} to {end_time} for assets: {assets}")
     historical_price_data: DataFrame = cm.get_CM_ReferenceRate(
         assets=assets, start=start_time, end=end_time, frequency="1s"
     )
@@ -140,7 +124,6 @@ def calc_rewards(  # noqa: C901
             asset_data = historical_price_data[historical_price_data["asset"] == asset]
             if not asset_data.empty:
                 all_cm_data[asset] = pd_to_dict(asset_data)  # noqa
-                bt.logging.debug(f"CM data fetched for {asset}: {len(all_cm_data[asset])} price points")
             else:
                 all_cm_data[asset] = {}
                 bt.logging.warning(f"No CM data returned for {asset}")
