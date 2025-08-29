@@ -37,7 +37,7 @@ miner:
 		--forward_function $(FORWARD_FUNCTION) \
 
 validator:
-	pm2 start --name $(VALIDATOR_NAME) poetry -- run python ./precog/validators/validator.py \
+	pm2 start --name $(VALIDATOR_NAME) python3 -- precog/validators/validator.py \
 		--neuron.name $(VALIDATOR_NAME) \
 		--wallet.name $(COLDKEY) \
 		--wallet.hotkey $(VALIDATOR_HOTKEY) \
