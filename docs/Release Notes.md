@@ -1,5 +1,11 @@
 Release Notes
 =============
+3.0.0
+-----
+Released on October 7th 2025
+- Miners now are evaluated on their predictions of ETH, BTC, and TAO
+- Validators will equally weight each prediction set to create a combined score.
+
 2.5.4
 -----
 Released on August 21st 2025

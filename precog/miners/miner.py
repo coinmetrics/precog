@@ -82,11 +82,11 @@ class Miner:
         self.current_block = func_with_retry(self.subtensor.get_current_block)
 
     async def forward(self, synapse: Challenge) -> Challenge:
-        synapse = self.forward_module.forward(synapse, self.cm)
-        if synapse.prediction is not None:
-            bt.logging.success(f"Predicted price: {synapse.prediction}  |  Predicted Interval: {synapse.interval}")
+        synapse = await self.forward_module.forward(synapse, self.cm)
+        if synapse.predictions is not None:
+            bt.logging.success(f"Predictions: {synapse.predictions}  |  Intervals: {synapse.intervals}")
         else:
-            bt.logging.info("No price predicted for this request.")
+            bt.logging.info("No predictions for this request.")
         return synapse
 
     def save_state(self):

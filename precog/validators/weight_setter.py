@@ -72,15 +72,29 @@ class weight_setter:
         self.loop.create_task(loop_handler(self, self.clear_old_miner_histories, sleep_time=3600))
 
     def __exit__(self, exc_type, exc_value, traceback):
+        bt.logging.warning(f"weight_setter.__exit__ called with exc_type={exc_type}, exc_value={exc_value}")
+        if exc_type:
+            bt.logging.error(f"Exit traceback: {traceback}")
+
         self.save_state()
         try:
+            # Set stop_event to signal all loop_handler tasks to stop gracefully
+            self.stop_event.set()
+
+            # Get all pending tasks
             pending = asyncio.all_tasks(self.loop)
+
+            # Cancel all tasks
             for task in pending:
                 task.cancel()
+
+            # Wait for all tasks to complete cancellation
+            if pending:
+                self.loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+
         except Exception as e:
-            bt.logging.error(f"Error on __exit__ function: {e}")
+            bt.logging.error(f"Error during cleanup in __exit__: {e}")
         finally:
-            asyncio.gather(*pending, return_exceptions=True)
             self.loop.stop()
 
     def __reset_instance__(self):
@@ -101,10 +115,8 @@ class weight_setter:
 
         try:
             for uid in self.MinerHistory:
-                # Call the clear_old_predictions method on each MinerHistory object
                 self.MinerHistory[uid].clear_old_predictions()
 
-            # Save the updated state after clearing
             self.save_state()
             bt.logging.success("Successfully cleared old predictions from all miners")
         except Exception as e:
@@ -126,9 +138,7 @@ class weight_setter:
 
         # Get current state for logging
         old_uids = set(self.available_uids)
-        old_history = set(self.MinerHistory.keys())
         bt.logging.debug(f"Before sync - Available UIDs: {old_uids}")
-        bt.logging.debug(f"Before sync - MinerHistory keys: {old_history}")
 
         # Update available UIDs
         self.available_uids = await self.get_available_uids()
@@ -148,15 +158,17 @@ class weight_setter:
             if new_miner or replaced_miner:
                 bt.logging.info(f"Replacing hotkey on {uid} with {self.metagraph.hotkeys[uid]}")
                 self.moving_average_scores[uid] = 0
-                if uid in new_uids:  # Only create history for available UIDs
+                if uid in new_uids:
                     self.MinerHistory[uid] = MinerHistory(uid, timezone=self.timezone)
 
-        # Ensure all available UIDs have MinerHistory entries
+        # Ensure all available UIDs have moving average scores and MinerHistory
         for uid in self.available_uids:
-            if uid not in self.MinerHistory:
-                bt.logging.info(f"Creating new MinerHistory for available UID {uid}")
-                self.MinerHistory[uid] = MinerHistory(uid, timezone=self.timezone)
+            if uid not in self.moving_average_scores:
+                bt.logging.info(f"Initializing moving average for UID {uid}")
                 self.moving_average_scores[uid] = 0
+            if uid not in self.MinerHistory:
+                bt.logging.info(f"Creating MinerHistory for UID {uid}")
+                self.MinerHistory[uid] = MinerHistory(uid, timezone=self.timezone)
 
         # Clean up old MinerHistory entries
         for uid in list(self.MinerHistory.keys()):
@@ -168,14 +180,14 @@ class weight_setter:
         self.scores = list(self.moving_average_scores.values())
 
         bt.logging.debug(f"After sync - Available UIDs: {new_uids}")
-        bt.logging.debug(f"After sync - MinerHistory keys: {set(self.MinerHistory.keys())}")
 
         # Save updated state
         self.save_state()
 
     async def query_miners(self):
         timestamp = to_str(round_to_interval(get_now(), interval_minutes=5))
-        synapse = Challenge(timestamp=timestamp)
+        synapse = Challenge(timestamp=timestamp, assets=constants.SUPPORTED_ASSETS)
+        bt.logging.info(f"Querying miners for {constants.SUPPORTED_ASSETS} predictions at {timestamp}")
         responses = await self.dendrite.forward(
             # Send the query to selected miner axons in the network.
             axons=[self.metagraph.axons[uid] for uid in self.available_uids],
@@ -276,8 +288,8 @@ class weight_setter:
         state_path = os.path.join(self.config.full_path, "state.pt")
         state = {
             "scores": self.scores,
-            "MinerHistory": self.MinerHistory,
             "moving_average_scores": self.moving_average_scores,
+            "MinerHistory": self.MinerHistory,
         }
         with open(state_path, "wb") as f:
             pickle.dump(state, f)
@@ -307,8 +319,11 @@ class weight_setter:
         # If we successfully loaded the file, then load the state
         else:
             self.scores = state["scores"]
-            self.MinerHistory = state["MinerHistory"]
             self.moving_average_scores = state["moving_average_scores"]
+            # Load MinerHistory if available, otherwise initialize empty
+            self.MinerHistory = state.get(
+                "MinerHistory", {uid: MinerHistory(uid, timezone=self.timezone) for uid in range(len(self.metagraph.S))}
+            )
 
         # Regardless log this text
         finally:

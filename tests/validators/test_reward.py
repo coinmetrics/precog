@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 from pandas import DataFrame
 
+from precog import constants
 from precog.protocol import Challenge
 from precog.utils.classes import MinerHistory
 from precog.utils.timestamp import to_str
@@ -24,66 +25,94 @@ class TestReward(unittest.TestCase):
         # Create MinerHistory instances for all 250 miners
         self.mock_validator.MinerHistory = {uid: MinerHistory(uid) for uid in range(250)}
 
-        # Load real Bitcoin price data
-        self.real_price_data = self._load_real_price_data()
-
-        if self.real_price_data is None:
-            self.skipTest("Real price data not available")
+        # Load real price data for all assets
+        self.all_asset_data = self._load_real_price_data()
 
     def _load_real_price_data(self):
-        """Load real Bitcoin price data from the saved file."""
-        test_data_path = Path("tests/data/btc_test_data.pkl")
+        """Load real price data for all supported assets."""
+        all_asset_data = {}
 
-        try:
+        # Load data for each asset
+        for asset in constants.SUPPORTED_ASSETS:
+            test_data_path = Path(f"tests/data/{asset}_test_data.pkl")
+
             with open(test_data_path, "rb") as f:
                 data = pickle.load(f)
+                all_asset_data[asset] = data["dict"]
 
-            self.eval_time = data["eval_time"]
-            self.prediction_time = data["prediction_time"]
-            self.timestamp_str = to_str(self.eval_time)
+        # Use the first asset (BTC) for timing info
+        btc_data_path = Path("tests/data/btc_test_data.pkl")
+        with open(btc_data_path, "rb") as f:
+            btc_data = pickle.load(f)
 
-            return data["dict"]
+        self.eval_time = btc_data["eval_time"]
+        self.prediction_time = btc_data["prediction_time"]
+        self.timestamp_str = to_str(self.eval_time)
 
-        except Exception as e:
-            self.skipTest(f"Test data not available: {e}")
+        return all_asset_data
 
     @patch("precog.validators.reward.CMData")
     @patch("precog.validators.reward.pd_to_dict")
     def test_calc_rewards(self, mock_pd_to_dict, mock_cm_data):
         """Simple test that calc_rewards works and miners with better predictions get higher rewards."""
-        # Setup mock data
+        # Setup mock data - create a proper DataFrame that matches expected structure
         mock_cm_instance = MagicMock()
         mock_cm_data.return_value = mock_cm_instance
-        mock_cm_instance.get_CM_ReferenceRate.return_value = DataFrame()
-        mock_pd_to_dict.return_value = self.real_price_data
 
-        actual_price = self.real_price_data[self.eval_time]
+        # Create a mock DataFrame with the expected structure
+        mock_df_data = []
+        for asset in constants.SUPPORTED_ASSETS:
+            for timestamp, price in self.all_asset_data[asset].items():
+                mock_df_data.append({"asset": asset, "time": timestamp, "ReferenceRateUSD": price})
+
+        mock_df = DataFrame(mock_df_data)
+        mock_cm_instance.get_CM_ReferenceRate.return_value = mock_df
+        mock_pd_to_dict.side_effect = lambda df: self.all_asset_data[df["asset"].iloc[0]]
+
+        # Get actual prices for all assets at eval time
+        actual_prices = {asset: self.all_asset_data[asset][self.eval_time] for asset in constants.SUPPORTED_ASSETS}
 
         # Create 250 miners: first 3 with known different prediction qualities for testing
         responses = []
 
         for uid in range(250):
-            miner = self.mock_validator.MinerHistory[uid]
+            predictions = {}
+            intervals = {}
 
-            if uid == 0:  # Perfect prediction
-                prediction = actual_price
-                interval = [actual_price - 100, actual_price + 100]
-            elif uid == 1:  # Poor prediction
-                prediction = actual_price - 5000  # $5000 off
-                interval = [actual_price - 6000, actual_price - 4000]
-            elif uid == 2:  # Terrible prediction
-                prediction = actual_price / 2  # 50% off
-                interval = [actual_price / 2 - 1000, actual_price / 2 + 1000]
-            else:  # Random predictions for remaining miners
-                prediction = actual_price + np.random.normal(0, 1000)
-                interval = [prediction - 500, prediction + 500]
+            for asset in constants.SUPPORTED_ASSETS:
+                actual_price = actual_prices[asset]
 
-            # Set up miner prediction history
-            miner.predictions[self.prediction_time] = prediction
-            miner.intervals[self.prediction_time] = interval
+                if uid == 0:  # Perfect prediction
+                    prediction = actual_price
+                    interval = [actual_price * 0.99, actual_price * 1.01]  # 1% range around actual
+                elif uid == 1:  # Poor prediction (off by ~5%)
+                    prediction = actual_price * 0.95
+                    interval = [actual_price * 0.93, actual_price * 0.97]
+                elif uid == 2:  # Terrible prediction (off by ~20%)
+                    prediction = actual_price * 0.8
+                    interval = [actual_price * 0.75, actual_price * 0.85]
+                else:  # Random predictions for remaining miners (within reasonable range)
+                    noise_factor = np.random.normal(1.0, 0.05)  # 5% std dev
+                    prediction = actual_price * noise_factor
+                    interval_width = actual_price * 0.02  # 2% range
+                    interval = [prediction - interval_width, prediction + interval_width]
 
-            # Create response
-            responses.append(Challenge(timestamp=self.timestamp_str, prediction=prediction, interval=interval))
+                predictions[asset] = prediction
+                intervals[asset] = interval
+
+            # Create response - using supported assets from constants
+            responses.append(
+                Challenge(
+                    timestamp=self.timestamp_str,
+                    assets=constants.SUPPORTED_ASSETS,
+                    predictions=predictions,
+                    intervals=intervals,
+                )
+            )
+
+            # Pre-populate MinerHistory with predictions from 1 hour ago
+            # The reward calculation expects to find predictions at prediction_time
+            self.mock_validator.MinerHistory[uid].add_prediction(to_str(self.prediction_time), predictions, intervals)
 
         # Calculate rewards
         rewards = calc_rewards(self.mock_validator, responses)
@@ -108,36 +137,57 @@ class TestReward(unittest.TestCase):
     @patch("precog.validators.reward.pd_to_dict")
     def test_miners_with_same_predictions_get_same_rewards(self, mock_pd_to_dict, mock_cm_data):
         """Test that miners with identical predictions receive identical rewards."""
-        # Setup mock data
+        # Setup mock data - create a proper DataFrame that matches expected structure
         mock_cm_instance = MagicMock()
         mock_cm_data.return_value = mock_cm_instance
-        mock_cm_instance.get_CM_ReferenceRate.return_value = DataFrame()
-        mock_pd_to_dict.return_value = self.real_price_data
 
-        actual_price = self.real_price_data[self.eval_time]
+        # Create a mock DataFrame with the expected structure
+        mock_df_data = []
+        for asset in constants.SUPPORTED_ASSETS:
+            for timestamp, price in self.all_asset_data[asset].items():
+                mock_df_data.append({"asset": asset, "time": timestamp, "ReferenceRateUSD": price})
 
-        # Create identical predictions for first 5 miners
-        identical_prediction = actual_price - 200
-        identical_interval = [actual_price - 400, actual_price]
+        mock_df = DataFrame(mock_df_data)
+        mock_cm_instance.get_CM_ReferenceRate.return_value = mock_df
+        mock_pd_to_dict.side_effect = lambda df: self.all_asset_data[df["asset"].iloc[0]]
+
+        # Get actual prices for all assets at eval time
+        actual_prices = {asset: self.all_asset_data[asset][self.eval_time] for asset in constants.SUPPORTED_ASSETS}
 
         responses = []
 
         for uid in range(250):
-            miner = self.mock_validator.MinerHistory[uid]
+            predictions = {}
+            intervals = {}
 
-            if uid < 5:  # First 5 miners: identical predictions
-                prediction = identical_prediction
-                interval = identical_interval
-            else:  # Different predictions for other miners
-                prediction = actual_price + np.random.normal(0, 1000)
-                interval = [prediction - 500, prediction + 500]
+            for asset in constants.SUPPORTED_ASSETS:
+                actual_price = actual_prices[asset]
 
-            # Set up miner prediction history
-            miner.predictions[self.prediction_time] = prediction
-            miner.intervals[self.prediction_time] = interval
+                if uid < 5:  # First 5 miners: identical predictions
+                    prediction = actual_price * 0.95  # 5% below actual
+                    interval = [actual_price * 0.9, actual_price * 1.0]
+                else:  # Different predictions for other miners
+                    noise_factor = np.random.normal(1.0, 0.1)  # 10% std dev
+                    prediction = actual_price * noise_factor
+                    interval_width = actual_price * 0.05  # 5% range
+                    interval = [prediction - interval_width, prediction + interval_width]
 
-            # Create response
-            responses.append(Challenge(timestamp=self.timestamp_str, prediction=prediction, interval=interval))
+                predictions[asset] = prediction
+                intervals[asset] = interval
+
+            # Create response - using supported assets from constants
+            responses.append(
+                Challenge(
+                    timestamp=self.timestamp_str,
+                    assets=constants.SUPPORTED_ASSETS,
+                    predictions=predictions,
+                    intervals=intervals,
+                )
+            )
+
+            # Pre-populate MinerHistory with predictions from 1 hour ago
+            # The reward calculation expects to find predictions at prediction_time
+            self.mock_validator.MinerHistory[uid].add_prediction(to_str(self.prediction_time), predictions, intervals)
 
         # Calculate rewards
         rewards = calc_rewards(self.mock_validator, responses)
